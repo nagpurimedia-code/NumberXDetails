@@ -46,8 +46,6 @@ RC_API = "https://yourapi.com/rc?rc={rc}"
 VEHICLE_API = "https://yourapi.com/vehicle?rc={rc}"
 IFSC_API = "https://yourapi.com/ifsc?ifsc={ifsc}"
 UPI_API = "https://yourapi.com/upi?id={upi}"
-# if you have any problem to add api just Paste file+your api in chatgpt and ask🤠
-# or Contact Me- @User_Died_X
 
 MAINTENANCE_TEXT = "⚙️ This feature is under maintenance. Credits not deducted."
 
@@ -463,256 +461,280 @@ async def message_handler(update: Update, context: CallbackContext):
                     write_json(USERS_FILE, users)
                     newbal = users[target]["credits"]
                     await update.message.reply_text(f"➖ *Deducted 1 credit* from `{target}`. New balance: *{newbal}*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-                    try:
-                        await context.bot.send_message(int(target), CREDIT_DEDUCTED_MSG.format(amt=1, bal=newbal, owner=BUY_CREDITS_USERNAME), parse_mode="Markdown")
-                    except: pass
             except:
                 await update.message.reply_text("❌ *Invalid user id.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
             context.user_data.pop("admin_state", None); return
 
-        # CUSTOM DEDUCT
+        # Custom Deduct
         if admin_state == "deduct_custom_waiting":
             try:
-                parts = text.split(); target = str(int(parts[0])); amt = int(parts[1])
+                parts = text.split()
+                if len(parts) < 2:
+                    await update.message.reply_text("❌ *Please provide user ID and amount. Example:* `123456789 5`", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
+                    context.user_data.pop("admin_state", None); return
+                target = str(int(parts[0]))
+                amount = int(parts[1])
                 users = read_json(USERS_FILE)
                 if target not in users:
                     await update.message.reply_text("❌ *User not found.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
                 else:
-                    users[target]["credits"] = max(0, users[target].get("credits", 0) - amt); write_json(USERS_FILE, users)
-                    newbal = users[target]["credits"]
-                    await update.message.reply_text(f"➖ *Deducted {amt} credits* from `{target}`. New balance: *{newbal}*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-                    try:
-                        await context.bot.send_message(int(target), CREDIT_DEDUCTED_MSG.format(amt=amt, bal=newbal, owner=BUY_CREDITS_USERNAME), parse_mode="Markdown")
-                    except: pass
-            except:
-                await update.message.reply_text("❌ *Invalid format.* Use: `<user_id> <amount>`", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-            context.user_data.pop("admin_state", None); return
-
-        # USER INFO
-        if admin_state == "user_info_waiting":
-            try:
-                target = str(int(text)); users = read_json(USERS_FILE)
-                if target not in users:
-                    await update.message.reply_text("❌ *User not found.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-                else:
-                    u = users[target]
-                    info = (f"🔎 *User `{target}`*\n• Credits: *{u.get('credits',0)}*\n• Referrals: *{u.get('referrals',0)}*\n• Referred by: `{u.get('referred_by')}`")
-                    await update.message.reply_text(info, parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-            except:
-                await update.message.reply_text("❌ *Invalid user id.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-            context.user_data.pop("admin_state", None); return
-
-        # GENERATE CODES
-        if admin_state == "gen_codes_waiting":
-            try:
-                parts = text.split(); credits = int(parts[0]); count = int(parts[1])
-                codes = read_json(CODES_FILE); new = []
-                for _ in range(count):
-                    c = gen_code(); codes[c] = {"credits": credits, "used": False}; new.append(c)
-                write_json(CODES_FILE, codes)
-                await update.message.reply_text("✅ *Generated codes:* \n```\n" + "\n".join(new) + "\n```", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-            except:
-                await update.message.reply_text("❌ *Invalid format.* Use: `<credits> <count>`", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-            context.user_data.pop("admin_state", None); return
-
-        # ADD CREDITS
-        if admin_state == "add_credit_waiting":
-            try:
-                parts = text.split(); target = str(int(parts[0])); amt = int(parts[1])
-                users = read_json(USERS_FILE)
-                if target not in users:
-                    await update.message.reply_text("❌ *User not found.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-                else:
-                    users[target]["credits"] = users[target].get("credits", 0) + amt
+                    users[target]["credits"] = max(0, users[target].get("credits", 0) - amount)
                     write_json(USERS_FILE, users)
                     newbal = users[target]["credits"]
-                    await update.message.reply_text(f"💰 *Added {amt} credits* to `{target}`. New balance: *{newbal}*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-                    try:
-                        await context.bot.send_message(int(target), CREDIT_ADDED_MSG.format(amt=amt, bal=newbal, owner=BUY_CREDITS_USERNAME), parse_mode="Markdown")
-                    except: pass
+                    await update.message.reply_text(f"➖ *Deducted {amount} credits* from `{target}`. New balance: *{newbal}*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
             except:
-                await update.message.reply_text("❌ *Invalid format.* Use: `<user_id> <amount>`", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
+                await update.message.reply_text("❌ *Invalid input. Use:* `user_id amount`", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
             context.user_data.pop("admin_state", None); return
 
-        # BROADCAST
+        # Add Credits
+        if admin_state == "add_credits_waiting":
+            try:
+                parts = text.split()
+                if len(parts) < 2:
+                    await update.message.reply_text("❌ *Please provide user ID and amount. Example:* `123456789 10`", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
+                    context.user_data.pop("admin_state", None); return
+                target = str(int(parts[0]))
+                amount = int(parts[1])
+                users = read_json(USERS_FILE)
+                if target not in users:
+                    await update.message.reply_text("❌ *User not found.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
+                else:
+                    users[target]["credits"] = users[target].get("credits", 0) + amount
+                    write_json(USERS_FILE, users)
+                    newbal = users[target]["credits"]
+                    await update.message.reply_text(f"➕ *Added {amount} credits* to `{target}`. New balance: *{newbal}*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
+            except:
+                await update.message.reply_text("❌ *Invalid input. Use:* `user_id amount`", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
+            context.user_data.pop("admin_state", None); return
+
+        # Broadcast
         if admin_state == "broadcast_waiting":
-            msg_text = text
             users = read_json(USERS_FILE)
-            total = len(users); sent = 0; failed = 0
-            for user_id in list(users.keys()):
+            sent = 0
+            for uid in users:
                 try:
-                    await context.bot.send_message(int(user_id), msg_text)
+                    await context.bot.send_message(int(uid), f"📢 *Admin Broadcast*\n\n{text}", parse_mode="Markdown")
                     sent += 1
-                except Exception:
-                    failed += 1
-            await update.message.reply_text(f"📣 *Broadcast complete.*\nTotal: {total}\nSent: {sent}\nFailed: {failed}", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
+                    time.sleep(0.05)
+                except:
+                    pass
+            await update.message.reply_text(f"✅ *Broadcast sent to {sent} users.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
             context.user_data.pop("admin_state", None); return
 
-    # normal search flows
-    if is_banned(uid):
-        await update.message.reply_text("❌ *You are banned from using this bot.*", parse_mode="Markdown"); return
+        # Generate Codes
+        if admin_state == "gen_codes_waiting":
+            try:
+                count = int(text)
+                if count < 1 or count > 100:
+                    await update.message.reply_text("❌ *Please provide a number between 1 and 100.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
+                    context.user_data.pop("admin_state", None); return
+                codes = read_json(CODES_FILE)
+                generated = []
+                for _ in range(count):
+                    code = gen_code()
+                    codes[code] = {"used": False}
+                    generated.append(code)
+                write_json(CODES_FILE, codes)
+                await update.message.reply_text(f"✅ *Generated {count} redeem codes:*\n`{' '.join(generated)}`", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
+            except:
+                await update.message.reply_text("❌ *Invalid number.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
+            context.user_data.pop("admin_state", None); return
 
-    mode = context.user_data.get("mode")
-    if not mode:
+        context.user_data.pop("admin_state", None)
         return
 
-    text = update.message.text.strip(); users = ensure_user(uid)
-
-    # Redeem
+    # ---------- Normal user message handling ----------
+    mode = context.user_data.get("mode")
+    
+    # Redeem code
     if mode == "redeem_code":
-        code = text.upper(); codes = read_json(CODES_FILE)
-        if code in codes and not codes[code].get("used", False):
-            amt = codes[code]["credits"]; users = read_json(USERS_FILE)
-            users[uid]["credits"] = users[uid].get("credits",0) + amt; codes[code]["used"] = True
-            write_json(USERS_FILE, users); write_json(CODES_FILE, codes)
-            await update.message.reply_text(f"✅ *Redeemed +{amt} credits.* Balance: *{users[uid]['credits']}*", parse_mode="Markdown")
+        code = update.message.text.strip().upper()
+        codes = read_json(CODES_FILE)
+        if code in codes and not codes[code]["used"]:
+            codes[code]["used"] = True
+            write_json(CODES_FILE, codes)
+            users = read_json(USERS_FILE)
+            users[uid]["credits"] = users[uid].get("credits", 0) + 1
+            write_json(USERS_FILE, users)
+            await update.message.reply_text("🎁 *Code redeemed! You earned 1 credit.*", parse_mode="Markdown")
         else:
             await update.message.reply_text("❌ *Invalid or already used code.*", parse_mode="Markdown")
-        context.user_data.pop("mode", None); return
-
-    # credit check & deduct
-    if not is_admin_user(user):
-        if users[uid].get("credits", 0) < SEARCH_COST:
-            await update.message.reply_text("❌ *Not enough credits.* Redeem or contact admin.", parse_mode="Markdown")
-            context.user_data.pop("mode", None); return
-        users[uid]["credits"] = users[uid].get("credits", 0) - SEARCH_COST; write_json(USERS_FILE, users)
-
-    # progress message
-    try: progress_msg = await update.message.reply_text("⏳ Fetching details...")
-    except: progress_msg = None
-
-    try:
-        r = None
-        if mode == "phone_in":
-            if not (text.isdigit() and len(text) == 10): raise Exception("Invalid phone")
-            r = http_get(PHONE_IN_API.format(num=text))
-        elif mode == "phone_pk":
-            r = http_get(PHONE_PK_API.format(num=text))
-        elif mode == "aadhaar":
-            if not text.isdigit(): raise Exception("Invalid aadhaar")
-            r = http_get(AADHAAR_API.format(aadhaar=text))
-            if not r: r = http_get(FAMILY_AADHAAR_API.format(aadhaar=text))
-        elif mode == "cnic":
-            r = http_get(CNIC_API.format(cnic=text))
-        elif mode == "ifsc":
-            r = http_get(IFSC_API.format(ifsc=text.upper()))
-        elif mode == "vehicle_rc":
-            r_rc = http_get(RC_API.format(rc=text))
-            data_rc = r_rc.json() if r_rc else None
-            if data_rc and not (isinstance(data_rc, dict) and data_rc.get("error")):
-                cleaned = scrub_response(data_rc)
-                js = json.dumps(cleaned, indent=2, ensure_ascii=False)
-                if progress_msg:
-                    try: await progress_msg.delete()
-                    except: pass
-                await update.message.reply_text(f"📑 *RC Results*\n```{js}```", parse_mode="Markdown")
-                context.user_data.pop("mode", None); return
-            r = http_get(VEHICLE_API.format(rc=text))
-        elif mode == "upi":
-            upi_input = text.strip()
-            r = http_get(UPI_API.format(upi=upi_input))
-        else:
-            r = None
-
-        if not r: raise Exception("no response")
-        data = r.json()
-        data = scrub_response(data)
-        js = json.dumps(data, indent=2, ensure_ascii=False)
-        if progress_msg:
-            try: await progress_msg.delete()
-            except: pass
-        await update.message.reply_text(f"🔎 *Results:*\n```{js}```", parse_mode="Markdown")
-    except Exception as e:
-        logger.warning(f"search error {mode}: {e}")
-        # refund credit
-        users = read_json(USERS_FILE); users[uid]["credits"] = users[uid].get("credits", 0) + SEARCH_COST; write_json(USERS_FILE, users)
-        if progress_msg:
-            try: await progress_msg.delete()
-            except: pass
-        await update.message.reply_text(ERROR_REFUND_MSG, parse_mode="Markdown")
-    finally:
         context.user_data.pop("mode", None)
-
-# ---------------- Admin panel callbacks ----------------
-async def admin_panel_handler(update_or_msg: Union[Update, Message], context: CallbackContext):
-    if isinstance(update_or_msg, Update):
-        user = update_or_msg.effective_user; target = update_or_msg.message
-    else:
-        user = update_or_msg.from_user; target = update_or_msg
-    if not is_admin_user(user):
-        await target.reply_text("❌ *You are not authorized to use admin commands.*", parse_mode="Markdown")
+        await update.message.reply_text("🔙 Back to Menu", reply_markup=back_to_menu_kb())
         return
-    await target.reply_text("⚙️ *Admin Panel*", parse_mode="Markdown", reply_markup=admin_panel_kb())
 
-async def admin_buttons(update: Update, context: CallbackContext):
+    # Search mode
+    if mode in ("phone_in", "phone_pk", "aadhaar", "cnic", "ifsc", "vehicle_rc", "upi"):
+        query = update.message.text.strip()
+        if not query:
+            await update.message.reply_text("❌ *Please provide a valid query.*", parse_mode="Markdown")
+            return
+
+        # Check credits (admins unlimited)
+        if not is_admin_user(user):
+            users = read_json(USERS_FILE)
+            if users[uid].get("credits", 0) < SEARCH_COST:
+                await update.message.reply_text("❌ *Not enough credits!* Use /start to get free credits or contact @{owner}".format(owner=BUY_CREDITS_USERNAME), parse_mode="Markdown")
+                return
+
+        # Map mode to API
+        api_map = {
+            "phone_in": PHONE_IN_API.format(num=query),
+            "phone_pk": PHONE_PK_API.format(num=query),
+            "aadhaar": AADHAAR_API.format(aadhaar=query),
+            "cnic": CNIC_API.format(cnic=query),
+            "ifsc": IFSC_API.format(ifsc=query),
+            "vehicle_rc": VEHICLE_API.format(rc=query),
+            "upi": UPI_API.format(id=query)
+        }
+        url = api_map.get(mode)
+        if not url:
+            await update.message.reply_text("❌ *Invalid search mode.*", parse_mode="Markdown")
+            return
+
+        # Deduct credit (unless admin)
+        if not is_admin_user(user):
+            users = read_json(USERS_FILE)
+            users[uid]["credits"] -= 1
+            write_json(USERS_FILE, users)
+
+        # Call API
+        try:
+            resp = http_get(url)
+            if resp and resp.status_code == 200:
+                data = resp.json()
+                # Scrub developer info
+                clean = scrub_response(data)
+                formatted = json.dumps(clean, indent=2, ensure_ascii=False)
+                if len(formatted) > 4000:
+                    formatted = formatted[:4000] + "\n... (truncated)"
+                await update.message.reply_text(f"📊 *Search Result*\n```json\n{formatted}\n```", parse_mode="Markdown")
+            else:
+                # Refund credit if error
+                if not is_admin_user(user):
+                    users = read_json(USERS_FILE)
+                    users[uid]["credits"] += 1
+                    write_json(USERS_FILE, users)
+                await update.message.reply_text(ERROR_REFUND_MSG, parse_mode="Markdown")
+        except Exception as e:
+            logger.error(f"Search error: {e}")
+            if not is_admin_user(user):
+                users = read_json(USERS_FILE)
+                users[uid]["credits"] += 1
+                write_json(USERS_FILE, users)
+            await update.message.reply_text(ERROR_REFUND_MSG, parse_mode="Markdown")
+
+        context.user_data.pop("mode", None)
+        await update.message.reply_text("🔙 Back to Menu", reply_markup=back_to_menu_kb())
+        return
+
+    await update.message.reply_text("ℹ️ *Use /start to see the menu.*", parse_mode="Markdown")
+
+# ---------------- Admin callback handlers ----------------
+async def admin_callback_handler(update: Update, context: CallbackContext):
     q = update.callback_query; await q.answer()
     user = q.from_user
     if not is_admin_user(user):
-        await q.answer("❌ Not authorized", show_alert=True); return
+        await q.message.reply_text("❌ *You are not authorized to use admin commands.*", parse_mode="Markdown")
+        return
+
     data = q.data
-
-    if data == "admin_stats":
-        users = read_json(USERS_FILE); total = len(users); total_credits = sum(u.get("credits",0) for u in users.values())
-        await q.edit_message_text(f"👥 *Total users:* {total}\n💳 *Total credits:* {total_credits}", parse_mode="Markdown", reply_markup=admin_panel_kb()); return
-
-    if data == "admin_gen_codes":
-        context.user_data["admin_state"] = "gen_codes_waiting"; await q.edit_message_text("🧾 *Generate Codes*\nSend: `<credits> <count>` (e.g. `5 10`)", parse_mode="Markdown"); return
-
-    if data == "admin_user_info":
-        context.user_data["admin_state"] = "user_info_waiting"; await q.edit_message_text("🔎 Send numeric user_id to view user's balance & referrals:"); return
-
-    if data == "admin_backup":
-        ok = send_backup_to_admins(); await q.edit_message_text("📦 Backup sent to admins." if ok else "⚠️ Backup failed or cooldown active.", reply_markup=admin_panel_kb()); return
-
-    if data == "admin_ban":
-        context.user_data["admin_state"] = "ban_waiting"; await q.edit_message_text("🚫 Send numeric user_id to BAN:", reply_markup=admin_action_back_buttons()); return
-
-    if data == "admin_unban":
-        context.user_data["admin_state"] = "unban_waiting"; await q.edit_message_text("✅ Send numeric user_id to UNBAN:", reply_markup=admin_action_back_buttons()); return
-
-    if data == "admin_deduct":
-        context.user_data["admin_state"] = "deduct_waiting"; await q.edit_message_text("➖ Send numeric user_id to deduct 1 credit:", reply_markup=admin_action_back_buttons()); return
-
-    if data == "admin_deduct_custom":
-        context.user_data["admin_state"] = "deduct_custom_waiting"; await q.edit_message_text("➖ Send: `<user_id> <amount>` (e.g. `7845479937 5`)", reply_markup=admin_action_back_buttons()); return
-
-    if data == "admin_add_credits":
-        context.user_data["admin_state"] = "add_credit_waiting"; await q.edit_message_text("➕ Send: `<user_id> <amount>` (e.g. `7845479937 10`)", parse_mode="Markdown"); return
-
-    if data == "admin_broadcast":
-        context.user_data["admin_state"] = "broadcast_waiting"; await q.edit_message_text("📣 Send the broadcast message you want to send to all users:", reply_markup=admin_action_back_buttons()); return
-
-    if data == "to_menu":
-        try: await q.message.delete()
-        except: pass
-        await q.message.reply_text("✅ *Select an option below:*", parse_mode="Markdown", reply_markup=main_menu_keyboard()); return
-
+    
+    # Admin panel
     if data == "admin_panel":
-        await q.edit_message_text("⚙️ *Admin Panel*", parse_mode="Markdown", reply_markup=admin_panel_kb()); return
+        await q.message.reply_text("⚙️ *Admin Panel*", parse_mode="Markdown", reply_markup=admin_panel_kb())
+        return
 
-    await q.message.reply_text("⚠️ *Unknown admin action.*", parse_mode="Markdown", reply_markup=admin_panel_kb())
+    # Admin Stats
+    if data == "admin_stats":
+        users = read_json(USERS_FILE)
+        total = len(users)
+        banned = sum(1 for u in users.values() if u.get("banned", False))
+        total_credits = sum(u.get("credits", 0) for u in users.values())
+        await q.message.reply_text(f"📊 *User Statistics*\n\n• Total Users: *{total}*\n• Banned: *{banned}*\n• Total Credits: *{total_credits}*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
+        return
 
-# ---------------- Setup & run ----------------
+    # Generate Codes
+    if data == "admin_gen_codes":
+        context.user_data["admin_state"] = "gen_codes_waiting"
+        await q.message.reply_text("🎁 *How many redeem codes to generate?* (max 100)", parse_mode="Markdown")
+        return
+
+    # User Info
+    if data == "admin_user_info":
+        context.user_data["admin_state"] = "user_info_waiting"
+        await q.message.reply_text("🔎 *Send the user ID to get info.*", parse_mode="Markdown")
+        context.user_data["admin_state"] = "user_info_waiting"
+        return
+
+    # Force Backup
+    if data == "admin_backup":
+        if send_backup_to_admins():
+            await q.message.reply_text("✅ *Backup sent to all admins.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
+        else:
+            await q.message.reply_text("⏳ *Backup cooldown active. Wait a few minutes.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
+        return
+
+    # Ban
+    if data == "admin_ban":
+        context.user_data["admin_state"] = "ban_waiting"
+        await q.message.reply_text("🚫 *Send the user ID to BAN.*", parse_mode="Markdown")
+        return
+
+    # Unban
+    if data == "admin_unban":
+        context.user_data["admin_state"] = "unban_waiting"
+        await q.message.reply_text("✅ *Send the user ID to UNBAN.*", parse_mode="Markdown")
+        return
+
+    # Deduct
+    if data == "admin_deduct":
+        context.user_data["admin_state"] = "deduct_waiting"
+        await q.message.reply_text("➖ *Send the user ID to deduct 1 credit.*", parse_mode="Markdown")
+        return
+
+    # Custom Deduct
+    if data == "admin_deduct_custom":
+        context.user_data["admin_state"] = "deduct_custom_waiting"
+        await q.message.reply_text("➖ *Send user ID and amount. Example:* `123456789 5`", parse_mode="Markdown")
+        return
+
+    # Add Credits
+    if data == "admin_add_credits":
+        context.user_data["admin_state"] = "add_credits_waiting"
+        await q.message.reply_text("➕ *Send user ID and amount. Example:* `123456789 10`", parse_mode="Markdown")
+        return
+
+    # Broadcast
+    if data == "admin_broadcast":
+        context.user_data["admin_state"] = "broadcast_waiting"
+        await q.message.reply_text("📣 *Send the broadcast message.*", parse_mode="Markdown")
+        return
+
+    await q.message.reply_text("⚠️ *Unknown admin action.*", parse_mode="Markdown")
+
+# ---------------- Main function ----------------
 def main():
-    ensure_files_exist()
-    app = Application.builder().token(BOT_TOKEN).build()
+    """Start the bot."""
+    # Create app with bot token
+    application = Application.builder().token(BOT_TOKEN).build()
 
-    # Commands
-    app.add_handler(CommandHandler("start", start_cmd))
-    app.add_handler(CommandHandler("menu", menu_cmd))
-    app.add_handler(CommandHandler("admin", admin_cmd))
+    # Command handlers
+    application.add_handler(CommandHandler("start", start_cmd))
+    application.add_handler(CommandHandler("menu", menu_cmd))
+    application.add_handler(CommandHandler("admin", admin_cmd))
 
-    # Callbacks & Admin
-    app.add_handler(CallbackQueryHandler(admin_buttons, pattern="^admin_.*$"))
-    app.add_handler(CallbackQueryHandler(to_menu_callback, pattern="^to_menu$"))
-    app.add_handler(CallbackQueryHandler(admin_buttons, pattern="^admin_panel$"))
-    app.add_handler(CallbackQueryHandler(generic_callback))  # generic handler
+    # Callback handlers
+    application.add_handler(CallbackQueryHandler(generic_callback, pattern="^(phone_in|phone_pk|aadhaar|cnic|ifsc|vehicle_rc|upi|redeem|credits|referral|help|daily_bonus|admin_panel|to_menu)$"))
+    application.add_handler(CallbackQueryHandler(admin_callback_handler, pattern="^(admin_stats|admin_gen_codes|admin_user_info|admin_backup|admin_ban|admin_unban|admin_deduct|admin_deduct_custom|admin_add_credits|admin_broadcast)$"))
+    
+    # Message handler
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
-    # Messages
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
-
-    logger.info("🚀 FKS OSINT BOT v8.8.3 - Bold Styled starting...")
-    app.run_polling()
+    # Run bot
+    print("🤖 Bot is running...")
+    application.run_polling()
 
 if __name__ == "__main__":
+    ensure_files_exist()
     main()
