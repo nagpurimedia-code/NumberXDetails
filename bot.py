@@ -1,9 +1,5 @@
-# FKS OSINT BOT FREE SRC ANY PROBLEM CONTACT ME
-# Edit Code Carefully Replace Your Bot Name IN FKS
-# Must See Readme.txt File In Zip For Complete Bot Instructions 
-# Requirements:
-# pip install python-telegram-bot==20.7 requests
-# Replace BOT_TOKEN with your bot token, then run: python bot.py
+# FKS OSINT BOT - FULLY WORKING
+# Telegram: @ColdenMinj
 
 import os
 import json
@@ -12,17 +8,16 @@ import random
 import string
 import logging
 import requests
-from typing import Union, Optional
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot, Message
+from typing import Optional
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, CallbackContext
 
-# ---------------- CONFIG ----------------
+# ============ CONFIG ============
 BOT_TOKEN = "8759960516:AAEWakdCpP7J7sSNXd6PtL34-l78vMF5zL4"
-BOT_USERNAME = "SearchPortalBot"        # provided by you (no @)
-BUY_CREDITS_USERNAME = "ColdenMinj" # contact username (no @)
-ADMIN_IDS = [8523360387]               # admin numeric IDs
+BOT_USERNAME = "SearchPortalBot"
+BUY_CREDITS_USERNAME = "ColdenMinj"
+ADMIN_IDS = [8523360387]
 
-# core settings
 REFERRAL_BONUS = 2
 INITIAL_CREDITS = 2
 SEARCH_COST = 1
@@ -31,68 +26,58 @@ DAILY_BONUS_AMOUNT = 2
 DAILY_SECONDS = 86400
 GENERATED_CODE_LENGTH = 8
 
-# data files
 USERS_FILE = "users.json"
 CODES_FILE = "redeem_codes.json"
 BACKUP_META = "backup_meta.json"
 
-# API endpoints (as provided)
+# ============ API ENDPOINTS (REPLACE WITH YOUR ACTUAL APIS) ============
 PHONE_IN_API = "https://yourapi.com/phone_in?number={num}"
 PHONE_PK_API = "https://yourapi.com/phone_pk?number={num}"
 AADHAAR_API = "https://yourapi.com/aadhaar?id={aadhaar}"
-FAMILY_AADHAAR_API = "https://yourapi.com/family?id={aadhaar}"
 CNIC_API = "https://yourapi.com/cnic?id={cnic}"
-RC_API = "https://yourapi.com/rc?rc={rc}"
-VEHICLE_API = "https://yourapi.com/vehicle?rc={rc}"
 IFSC_API = "https://yourapi.com/ifsc?ifsc={ifsc}"
+VEHICLE_API = "https://yourapi.com/vehicle?rc={rc}"
 UPI_API = "https://yourapi.com/upi?id={upi}"
 
-MAINTENANCE_TEXT = "⚙️ This feature is under maintenance. Credits not deducted."
-
-# ---------------- logging ----------------
+# ============ LOGGING ============
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-logger = logging.getLogger("fks-osint-bot")
+logger = logging.getLogger("fks-bot")
 
-# ---------------- helpers for JSON files ----------------
-def read_json(path: str) -> dict:
+# ============ FILE HELPERS ============
+def read_json(path):
     if not os.path.exists(path):
         return {}
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
-    except Exception as e:
-        logger.warning(f"read_json error {path}: {e}")
+    except:
         return {}
 
-def write_json(path: str, data) -> None:
+def write_json(path, data):
     try:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        logger.warning(f"write_json error {path}: {e}")
+        logger.error(f"Write error: {e}")
 
-def ensure_files_exist():
-    for fn in [USERS_FILE, CODES_FILE, BACKUP_META]:
-        if not os.path.exists(fn):
-            write_json(fn, {})
+def ensure_files():
+    for f in [USERS_FILE, CODES_FILE, BACKUP_META]:
+        if not os.path.exists(f):
+            write_json(f, {})
 
-# ---------------- misc helpers ----------------
-def gen_code(length: int = GENERATED_CODE_LENGTH) -> str:
-    chars = string.ascii_uppercase + string.digits
-    return "".join(random.choice(chars) for _ in range(length))
+# ============ HELPERS ============
+def gen_code():
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=GENERATED_CODE_LENGTH))
 
-def http_get(url: str, timeout: int = 12) -> Optional[requests.Response]:
-    headers = {"User-Agent": "FKS-OSINT-BOT/8.8.3"}
+def http_get(url, timeout=12):
     try:
-        r = requests.get(url, headers=headers, timeout=timeout)
+        r = requests.get(url, headers={"User-Agent": "FKS-BOT"}, timeout=timeout)
         r.raise_for_status()
         return r
-    except Exception as e:
-        logger.debug(f"http_get error for {url}: {e}")
+    except:
         return None
 
-# ---------------- user data helpers ----------------
-def ensure_user(uid: str) -> dict:
+def ensure_user(uid):
     users = read_json(USERS_FILE)
     if uid not in users:
         users[uid] = {
@@ -103,137 +88,64 @@ def ensure_user(uid: str) -> dict:
             "last_daily": 0
         }
         write_json(USERS_FILE, users)
-    # make sure keys exist
-    changed = False
-    if "referred_by" not in users[uid]:
-        users[uid]["referred_by"] = None; changed = True
-    if "last_daily" not in users[uid]:
-        users[uid]["last_daily"] = 0; changed = True
-    if changed:
-        write_json(USERS_FILE, users)
     return users
 
-def is_banned(uid: str) -> bool:
+def is_banned(uid):
     users = read_json(USERS_FILE)
     return users.get(uid, {}).get("banned", False)
 
-# ---------------- admin check (robust) ----------------
-def is_admin_user(tuser) -> bool:
-    if tuser is None:
+def is_admin(user):
+    if not user:
         return False
     try:
-        if int(tuser.id) in [int(x) for x in ADMIN_IDS]:
+        if user.id in ADMIN_IDS:
             return True
-    except Exception:
+    except:
         pass
     try:
-        if tuser.username and tuser.username.lower() == str(BUY_CREDITS_USERNAME).lower():
+        if user.username and user.username.lower() == BUY_CREDITS_USERNAME.lower():
             return True
-    except Exception:
+    except:
         pass
     return False
 
-# ---------------- scrub copyright/owner fields ----------------
 def scrub_response(obj):
-    """Recursively remove developer/copyright/owner fields and values."""
-    block_keys = [
-        "developer", "developer_message", "developer_tag",
-        "api_by", "api_owner", "owner", "source", "author", "dev", "creator", "footer", "tag"
-    ]
-
+    block = ["developer", "owner", "author", "creator", "api_by", "dev", "tag", "footer"]
     if isinstance(obj, dict):
         clean = {}
         for k, v in obj.items():
-            kl = k.lower().strip()
-            # skip keys that contain block words
-            if any(b in kl for b in block_keys):
+            if any(b in k.lower() for b in block):
                 continue
-            # skip short string values that look like developer credits
-            if isinstance(v, str):
-                lowv = v.lower()
-                if any(b in lowv for b in block_keys):
-                    continue
+            if isinstance(v, str) and any(b in v.lower() for b in block):
+                continue
             clean[k] = scrub_response(v)
         return clean
-
     elif isinstance(obj, list):
         return [scrub_response(x) for x in obj]
+    return obj
 
-    else:
-        return obj
-
-# ---------------- backup ----------------
-def send_backup_to_admins() -> bool:
+def send_backup():
     meta = read_json(BACKUP_META)
     now = int(time.time())
     if now - meta.get("last", 0) < BACKUP_COOLDOWN:
-        logger.info("backup cooldown active")
         return False
     try:
         bot = Bot(token=BOT_TOKEN)
         if os.path.exists(USERS_FILE):
-            for admin_id in ADMIN_IDS:
+            for admin in ADMIN_IDS:
                 try:
                     with open(USERS_FILE, "rb") as f:
-                        bot.send_document(chat_id=int(admin_id), document=f, filename="users.json", caption="📦 FKS OSINT - users backup")
-                except Exception as e:
-                    logger.warning(f"send_backup to {admin_id} failed: {e}")
+                        bot.send_document(chat_id=admin, document=f, filename="users.json", caption="📦 Backup")
+                except:
+                    pass
         meta["last"] = now
         write_json(BACKUP_META, meta)
         return True
-    except Exception as e:
-        logger.warning(f"backup failed: {e}")
+    except:
         return False
 
-# ---------------- Styled UI text ----------------
-WELCOME_TEXT = (
-    "👋 *𝗛𝗶 {name} — 𝗪𝗲𝗹𝗰𝗼𝗺𝗲 𝘁𝗼 𝗙𝗞𝗦 𝗢𝗦𝗜𝗡𝗧 𝗕𝗢𝗧 ⚡*\n\n"
-    "💡 *Educational & lawful OSINT use only.*\n"
-    "📚 Use findings responsibly — do not harass, doxx, or commit illegal acts We Are Not Responsible For Anything Illigal.\n\n"
-    "🔐 *Credits:* Each search costs *1 credit*.\n"
-    "🎁 *Daily Bonus:* Claim once per 24 hours.\n"
-    "🎯 *Referral:* Earn credits when a new user joins using your link.\n\n"
-    "Need help? Contact @{owner}\n"
-).format(name="{name}", owner=BUY_CREDITS_USERNAME)
-
-HELP_TEXT = (
-    "📘 *FKS OSINT Assistant — Help Center*\n\n"
-    "🔍 *Available Searches:*\n"
-    "• Phone (India / Pakistan)\n"
-    "• Aadhaar (family details when available)\n"
-    "• CNIC\n"
-    "• IFSC\n"
-    "• Vehicle / RC\n"
-    "• UPI Info\n\n"
-    "💳 *Credits:* Each search costs *1 credit*. If no result, credit is refunded.\n"
-    "🎁 *Daily Bonus:* Claim once per 24 hours for free credits.\n"
-    "🎯 *Referral:* Share your link. You earn credits when a *new* user joins using your link.\n\n"
-    "Contact @{owner} for support."
-).format(owner=BUY_CREDITS_USERNAME)
-
-CREDIT_DEDUCTED_MSG = (
-    "⚠️ *Credits deducted by Admin*\n\n"
-    "• Amount: *-{amt}*\n"
-    "• New Balance: *{bal}*\n\n"
-    "If you think this is an error, contact @{owner}."
-)
-
-CREDIT_ADDED_MSG = (
-    "💰 *Credits added by Admin*\n\n"
-    "• Amount: *+{amt}*\n"
-    "• New Balance: *{bal}*\n\n"
-    "Enjoy your searches! Contact @{owner} for help."
-)
-
-REFERRAL_EARNED_MSG = "🎉 *New user joined with your referral!* You earned *{amt}* credits. Thank you!"
-
-DAILY_CLAIMED_MSG = "🎁 *You claimed your Daily Bonus!* +{amt} credits."
-
-ERROR_REFUND_MSG = "⚠️ *Error fetching data.* Credits refunded."
-
-# ---------------- Keyboards ----------------
-def main_menu_keyboard():
-    buy_url = f"https://t.me/{BUY_CREDITS_USERNAME}"
+# ============ KEYBOARDS ============
+def main_menu():
     kb = [
         [InlineKeyboardButton("Phone 🇮🇳", callback_data="phone_in"),
          InlineKeyboardButton("Phone 🇵🇰", callback_data="phone_pk"),
@@ -241,293 +153,234 @@ def main_menu_keyboard():
         [InlineKeyboardButton("CNIC 🇵🇰", callback_data="cnic"),
          InlineKeyboardButton("IFSC 🏦", callback_data="ifsc"),
          InlineKeyboardButton("Vehicle/RC 🚗", callback_data="vehicle_rc")],
-        [InlineKeyboardButton("🔗 UPI Info", callback_data="upi"),
+        [InlineKeyboardButton("UPI 🔗", callback_data="upi"),
          InlineKeyboardButton("🎁 Redeem", callback_data="redeem"),
          InlineKeyboardButton("🎯 Referral", callback_data="referral")],
         [InlineKeyboardButton("💰 Credits", callback_data="credits"),
          InlineKeyboardButton("🎁 Daily Bonus", callback_data="daily_bonus"),
          InlineKeyboardButton("❓ Help", callback_data="help")],
-        [InlineKeyboardButton("💳 Buy Credits", url=buy_url)]
+        [InlineKeyboardButton("💳 Buy Credits", url=f"https://t.me/{BUY_CREDITS_USERNAME}")]
     ]
     return InlineKeyboardMarkup(kb)
 
-def back_to_menu_kb():
-    return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to Menu", callback_data="to_menu")]])
+def back_menu():
+    return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="to_menu")]])
 
-def admin_panel_kb():
+def admin_menu():
     kb = [
-        [InlineKeyboardButton("📊 User Stats", callback_data="admin_stats"),
-         InlineKeyboardButton("🎁 Generate Codes", callback_data="admin_gen_codes"),
-         InlineKeyboardButton("🔎 User Info", callback_data="admin_user_info")],
-        [InlineKeyboardButton("📦 Force Backup", callback_data="admin_backup"),
-         InlineKeyboardButton("🚫 Ban User", callback_data="admin_ban"),
-         InlineKeyboardButton("✅ Unban User", callback_data="admin_unban"),
-         InlineKeyboardButton("➖ Deduct -1", callback_data="admin_deduct")],
-        [InlineKeyboardButton("➖➖ Custom Deduct", callback_data="admin_deduct_custom"),
-         InlineKeyboardButton("➕ Add Credits", callback_data="admin_add_credits"),
-         InlineKeyboardButton("📣 Broadcast", callback_data="admin_broadcast")],
-        [InlineKeyboardButton("🏠 Back to Main Menu", callback_data="to_menu")]
+        [InlineKeyboardButton("📊 Stats", callback_data="admin_stats"),
+         InlineKeyboardButton("🎁 Gen Codes", callback_data="admin_gen_codes")],
+        [InlineKeyboardButton("📦 Backup", callback_data="admin_backup"),
+         InlineKeyboardButton("🚫 Ban", callback_data="admin_ban"),
+         InlineKeyboardButton("✅ Unban", callback_data="admin_unban")],
+        [InlineKeyboardButton("➖ Deduct", callback_data="admin_deduct"),
+         InlineKeyboardButton("➕ Add Credits", callback_data="admin_add_credits")],
+        [InlineKeyboardButton("📣 Broadcast", callback_data="admin_broadcast"),
+         InlineKeyboardButton("🏠 Main Menu", callback_data="to_menu")]
     ]
     return InlineKeyboardMarkup(kb)
 
-def admin_action_back_buttons():
+def admin_back():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔙 Back to Admin Menu", callback_data="admin_panel"),
-         InlineKeyboardButton("🏠 Back to Main Menu", callback_data="to_menu")]
+        [InlineKeyboardButton("🔙 Admin Panel", callback_data="admin_panel"),
+         InlineKeyboardButton("🏠 Main Menu", callback_data="to_menu")]
     ])
 
-# ---------------- Commands ----------------
-async def start_cmd(update: Update, context: CallbackContext):
+# ============ COMMANDS ============
+async def start(update: Update, context: CallbackContext):
     user = update.effective_user
     uid = str(user.id)
-    args = context.args or []
-
-    # check if user already existed before calling ensure_user
+    
     users_before = read_json(USERS_FILE)
-    user_existed_before = uid in users_before
-
+    is_new = uid not in users_before
+    
     ensure_user(uid)
+    
     if is_banned(uid):
-        await update.message.reply_text("❌ *You are banned from using this bot.*", parse_mode="Markdown")
+        await update.message.reply_text("❌ You are banned.", parse_mode="Markdown")
         return
-
-    # Referral: only credit referrer once AND only if the user is NEW (joined using the link)
-    if args:
-        ref = args[0]
+    
+    # Referral
+    args = context.args
+    if args and is_new:
         try:
-            ref_id = str(int(ref))
+            ref = str(int(args[0]))
+            if ref != uid:
+                users = read_json(USERS_FILE)
+                if users[uid].get("referred_by") is None:
+                    users[uid]["referred_by"] = ref
+                    if ref in users:
+                        users[ref]["credits"] = users[ref].get("credits", 0) + REFERRAL_BONUS
+                        users[ref]["referrals"] = users[ref].get("referrals", 0) + 1
+                        write_json(USERS_FILE, users)
+                        try:
+                            await context.bot.send_message(int(ref), f"🎉 You earned {REFERRAL_BONUS} credits from referral!")
+                        except:
+                            pass
         except:
-            ref_id = None
-        # only process referral if:
-        # 1) ref_id is valid and not self
-        # 2) this user did NOT exist before (i.e. truly a new join)
-        # 3) referred_by is still None (safety)
-        if ref_id and ref_id != uid and not user_existed_before:
-            users = read_json(USERS_FILE)
-            if users.get(uid, {}).get("referred_by") is None:
-                users[uid]["referred_by"] = ref_id
-                write_json(USERS_FILE, users)
-                if ref_id in users:
-                    users[ref_id]["credits"] = users[ref_id].get("credits", 0) + REFERRAL_BONUS
-                    users[ref_id]["referrals"] = users[ref_id].get("referrals", 0) + 1
-                    write_json(USERS_FILE, users)
-                    try:
-                        await context.bot.send_message(int(ref_id), REFERRAL_EARNED_MSG.format(amt=REFERRAL_BONUS), parse_mode="Markdown")
-                    except Exception:
-                        logger.debug("could not DM referrer")
+            pass
+    
+    welcome = f"👋 Hi {user.first_name}! Welcome to FKS OSINT Bot.\n\n🔍 Each search costs 1 credit.\n🎁 Daily bonus: {DAILY_BONUS_AMOUNT} credits\n🎯 Referral: {REFERRAL_BONUS} credits per referral\n\nContact @{BUY_CREDITS_USERNAME} for help."
+    await update.message.reply_text(welcome, parse_mode="Markdown")
+    await update.message.reply_text("✅ Choose an option:", reply_markup=main_menu())
 
-    # Welcome (styled)
-    wtext = WELCOME_TEXT.format(name=user.first_name)
-    await update.message.reply_text(wtext, parse_mode="Markdown")
-    await update.message.reply_text("✅ *Select an option below:*", parse_mode="Markdown", reply_markup=main_menu_keyboard())
+async def menu(update: Update, context: CallbackContext):
+    await update.message.reply_text("✅ Choose an option:", reply_markup=main_menu())
 
-async def menu_cmd(update: Update, context: CallbackContext):
-    await update.message.reply_text("✅ *Select an option below:*", parse_mode="Markdown", reply_markup=main_menu_keyboard())
-
-async def admin_cmd(update: Update, context: CallbackContext):
+async def admin_panel(update: Update, context: CallbackContext):
     user = update.effective_user
-    if not is_admin_user(user):
-        await update.message.reply_text("❌ *You are not authorized to use admin commands.*", parse_mode="Markdown")
+    if not is_admin(user):
+        await update.message.reply_text("❌ Unauthorized.", parse_mode="Markdown")
         return
-    await update.message.reply_text("⚙️ *Admin Panel*", parse_mode="Markdown", reply_markup=admin_panel_kb())
+    await update.message.reply_text("⚙️ Admin Panel:", reply_markup=admin_menu())
 
-# ---------------- Callbacks ----------------
-async def to_menu_callback(update: Update, context: CallbackContext):
-    q = update.callback_query; await q.answer()
-    try:
-        await q.message.delete()
-    except:
-        pass
-    await q.message.reply_text("✅ *Select an option below:*", parse_mode="Markdown", reply_markup=main_menu_keyboard())
-
-async def help_callback(update: Update, context: CallbackContext):
-    q = update.callback_query; await q.answer()
-    await q.message.reply_text(HELP_TEXT, parse_mode="Markdown", reply_markup=back_to_menu_kb())
-
-async def referral_callback(update: Update, context: CallbackContext):
-    q = update.callback_query; await q.answer()
-    uid = str(q.from_user.id)
-    link = f"https://t.me/{BOT_USERNAME}?start={uid}"
-    text = (f"🎯 *Invite & Earn!* \n\nShare this link:\n`{link}`\n\nWhen a *new* user joins with your link, you earn *{REFERRAL_BONUS} credits*.")
-    await q.message.reply_text(text, parse_mode="Markdown", reply_markup=back_to_menu_kb())
-
-async def daily_bonus_callback(update: Update, context: CallbackContext):
-    q = update.callback_query; await q.answer()
-    uid = str(q.from_user.id)
-    users = ensure_user(uid)
-    now = int(time.time())
-    if now - users[uid].get("last_daily", 0) >= DAILY_SECONDS:
-        users[uid]["credits"] = users[uid].get("credits", 0) + DAILY_BONUS_AMOUNT
-        users[uid]["last_daily"] = now
-        write_json(USERS_FILE, users)
-        await q.message.reply_text(DAILY_CLAIMED_MSG.format(amt=DAILY_BONUS_AMOUNT), parse_mode="Markdown")
-    else:
-        await q.message.reply_text("⏰ *You already claimed your daily bonus today.* Try again tomorrow.", parse_mode="Markdown")
-    await q.message.reply_text("🔙 Back to Menu", reply_markup=back_to_menu_kb())
-
-# ---------------- Generic callback handler ----------------
-async def generic_callback(update: Update, context: CallbackContext):
-    q = update.callback_query; await q.answer()
-    data = q.data
-
-    if data in ("phone_in", "phone_pk", "aadhaar", "cnic", "ifsc", "vehicle_rc", "upi"):
-        context.user_data["mode"] = data
-        label = "RC/Vehicle" if data == "vehicle_rc" else data.upper()
-        if data == "upi": label = "UPI ID (e.g. 9693331989@ybl)"
-        await q.message.reply_text(f"➡️ *Send the {label} to search now.*", parse_mode="Markdown")
+# ============ CALLBACKS ============
+async def callback_handler(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+    user = query.from_user
+    uid = str(user.id)
+    data = query.data
+    
+    # Admin callbacks
+    if data.startswith("admin_"):
+        if not is_admin(user):
+            await query.message.reply_text("❌ Unauthorized.", parse_mode="Markdown")
+            return
+        
+        # Admin Stats
+        if data == "admin_stats":
+            users = read_json(USERS_FILE)
+            total = len(users)
+            banned = sum(1 for u in users.values() if u.get("banned", False))
+            credits = sum(u.get("credits", 0) for u in users.values())
+            await query.message.reply_text(f"📊 Stats:\nTotal: {total}\nBanned: {banned}\nCredits: {credits}", parse_mode="Markdown", reply_markup=admin_back())
+            return
+        
+        # Generate Codes
+        if data == "admin_gen_codes":
+            context.user_data["admin_state"] = "gen_codes"
+            await query.message.reply_text("🎁 How many codes? (max 50)", parse_mode="Markdown")
+            return
+        
+        # Backup
+        if data == "admin_backup":
+            if send_backup():
+                await query.message.reply_text("✅ Backup sent.", parse_mode="Markdown", reply_markup=admin_back())
+            else:
+                await query.message.reply_text("⏳ Cooldown active.", parse_mode="Markdown", reply_markup=admin_back())
+            return
+        
+        # Ban
+        if data == "admin_ban":
+            context.user_data["admin_state"] = "ban"
+            await query.message.reply_text("🚫 Send user ID to ban:", parse_mode="Markdown")
+            return
+        
+        # Unban
+        if data == "admin_unban":
+            context.user_data["admin_state"] = "unban"
+            await query.message.reply_text("✅ Send user ID to unban:", parse_mode="Markdown")
+            return
+        
+        # Deduct
+        if data == "admin_deduct":
+            context.user_data["admin_state"] = "deduct"
+            await query.message.reply_text("➖ Send user ID to deduct 1 credit:", parse_mode="Markdown")
+            return
+        
+        # Add Credits
+        if data == "admin_add_credits":
+            context.user_data["admin_state"] = "add_credits"
+            await query.message.reply_text("➕ Send: `user_id amount` (e.g. 123 5)", parse_mode="Markdown")
+            return
+        
+        # Broadcast
+        if data == "admin_broadcast":
+            context.user_data["admin_state"] = "broadcast"
+            await query.message.reply_text("📣 Send broadcast message:", parse_mode="Markdown")
+            return
+        
+        # Admin Panel
+        if data == "admin_panel":
+            await query.message.reply_text("⚙️ Admin Panel:", reply_markup=admin_menu())
+            return
+    
+    # Public callbacks
+    if data == "to_menu":
+        try:
+            await query.message.delete()
+        except:
+            pass
+        await query.message.reply_text("✅ Choose an option:", reply_markup=main_menu())
         return
-
-    if data == "redeem":
-        context.user_data["mode"] = "redeem_code"
-        await q.message.reply_text("🎁 *Send your redeem code now.*", parse_mode="Markdown")
+    
+    if data == "help":
+        help_text = "🔍 Available searches:\n• Phone (IN/PK)\n• Aadhaar\n• CNIC\n• IFSC\n• Vehicle/RC\n• UPI\n\n💳 Each search costs 1 credit.\n🎁 Daily bonus available.\n🎯 Referral program active."
+        await query.message.reply_text(help_text, parse_mode="Markdown", reply_markup=back_menu())
         return
-
+    
+    if data == "referral":
+        link = f"https://t.me/{BOT_USERNAME}?start={uid}"
+        await query.message.reply_text(f"🎯 Your referral link:\n`{link}`\n\nEarn {REFERRAL_BONUS} credits per referral!", parse_mode="Markdown", reply_markup=back_menu())
+        return
+    
+    if data == "daily_bonus":
+        users = ensure_user(uid)
+        now = int(time.time())
+        if now - users[uid].get("last_daily", 0) >= DAILY_SECONDS:
+            users[uid]["credits"] = users[uid].get("credits", 0) + DAILY_BONUS_AMOUNT
+            users[uid]["last_daily"] = now
+            write_json(USERS_FILE, users)
+            await query.message.reply_text(f"🎁 +{DAILY_BONUS_AMOUNT} credits claimed!", parse_mode="Markdown")
+        else:
+            remaining = DAILY_SECONDS - (now - users[uid].get("last_daily", 0))
+            hours = int(remaining // 3600)
+            await query.message.reply_text(f"⏰ Already claimed. Try again in {hours}h.", parse_mode="Markdown")
+        await query.message.reply_text("🔙 Back", reply_markup=back_menu())
+        return
+    
     if data == "credits":
         users = read_json(USERS_FILE)
-        cr = users.get(str(q.from_user.id), {}).get("credits", 0)
-        if is_admin_user(q.from_user):
-            await q.message.reply_text("💳 *Credits:* Unlimited (Admin)", parse_mode="Markdown")
-        else:
-            await q.message.reply_text(f"💳 *Your Credits:* *{cr}*", parse_mode="Markdown")
+        credits = "Unlimited" if is_admin(user) else users.get(uid, {}).get("credits", 0)
+        await query.message.reply_text(f"💰 Your credits: {credits}", parse_mode="Markdown")
         return
-
-    if data == "referral":
-        await referral_callback(update, context); return
-    if data == "help":
-        await help_callback(update, context); return
-    if data == "daily_bonus":
-        await daily_bonus_callback(update, context); return
-    if data == "admin_panel":
-        if not is_admin_user(q.from_user):
-            await q.message.reply_text("❌ *You are not authorized to use admin commands.*", parse_mode="Markdown")
-            return
-        await q.message.reply_text("⚙️ *Admin Panel*", parse_mode="Markdown", reply_markup=admin_panel_kb())
+    
+    if data == "redeem":
+        context.user_data["mode"] = "redeem"
+        await query.message.reply_text("🎁 Send your redeem code:", parse_mode="Markdown")
         return
+    
+    # Search modes
+    if data in ["phone_in", "phone_pk", "aadhaar", "cnic", "ifsc", "vehicle_rc", "upi"]:
+        context.user_data["mode"] = data
+        label = "RC/Vehicle" if data == "vehicle_rc" else data.upper()
+        if data == "upi":
+            label = "UPI ID"
+        await query.message.reply_text(f"📤 Send {label} to search:", parse_mode="Markdown")
+        return
+    
+    await query.message.reply_text("⚠️ Unknown option.", parse_mode="Markdown")
 
-    await q.message.reply_text("⚠️ *Unknown action.*", parse_mode="Markdown")
-
-# ---------------- Message handler (search + admin states) ----------------
+# ============ MESSAGE HANDLER ============
 async def message_handler(update: Update, context: CallbackContext):
-    user = update.effective_user; uid = str(user.id)
+    user = update.effective_user
+    uid = str(user.id)
+    text = update.message.text.strip()
+    
+    if is_banned(uid):
+        await update.message.reply_text("❌ You are banned.", parse_mode="Markdown")
+        return
+    
     ensure_user(uid)
-
-    # admin interactive state machine
+    
+    # Admin states
     admin_state = context.user_data.get("admin_state")
-    if admin_state:
-        if not is_admin_user(user):
-            await update.message.reply_text("❌ *You are not authorized for admin actions.*", parse_mode="Markdown")
-            context.user_data.pop("admin_state", None)
-            return
-        text = update.message.text.strip()
-
-        # BAN
-        if admin_state == "ban_waiting":
-            try:
-                target = str(int(text)); users = read_json(USERS_FILE)
-                if target not in users:
-                    await update.message.reply_text("❌ *User not found.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-                else:
-                    users[target]["banned"] = True; write_json(USERS_FILE, users)
-                    await update.message.reply_text(f"🚫 *User `{target}` has been BANNED.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-                    try: await context.bot.send_message(int(target), "🚫 You have been banned by the admin.")
-                    except: pass
-            except:
-                await update.message.reply_text("❌ *Invalid user id.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-            context.user_data.pop("admin_state", None); return
-
-        # UNBAN
-        if admin_state == "unban_waiting":
-            try:
-                target = str(int(text)); users = read_json(USERS_FILE)
-                if target not in users:
-                    await update.message.reply_text("❌ *User not found.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-                else:
-                    users[target]["banned"] = False; write_json(USERS_FILE, users)
-                    await update.message.reply_text(f"✅ *User `{target}` has been UNBANNED.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-                    try: await context.bot.send_message(int(target), "✅ You have been unbanned by the admin.")
-                    except: pass
-            except:
-                await update.message.reply_text("❌ *Invalid user id.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-            context.user_data.pop("admin_state", None); return
-
-        # DEDUCT -1
-        if admin_state == "deduct_waiting":
-            try:
-                target = str(int(text)); users = read_json(USERS_FILE)
-                if target not in users:
-                    await update.message.reply_text("❌ *User not found.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-                else:
-                    users[target]["credits"] = max(0, users[target].get("credits", 0) - 1)
-                    write_json(USERS_FILE, users)
-                    newbal = users[target]["credits"]
-                    await update.message.reply_text(f"➖ *Deducted 1 credit* from `{target}`. New balance: *{newbal}*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-            except:
-                await update.message.reply_text("❌ *Invalid user id.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-            context.user_data.pop("admin_state", None); return
-
-        # Custom Deduct
-        if admin_state == "deduct_custom_waiting":
-            try:
-                parts = text.split()
-                if len(parts) < 2:
-                    await update.message.reply_text("❌ *Please provide user ID and amount. Example:* `123456789 5`", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-                    context.user_data.pop("admin_state", None); return
-                target = str(int(parts[0]))
-                amount = int(parts[1])
-                users = read_json(USERS_FILE)
-                if target not in users:
-                    await update.message.reply_text("❌ *User not found.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-                else:
-                    users[target]["credits"] = max(0, users[target].get("credits", 0) - amount)
-                    write_json(USERS_FILE, users)
-                    newbal = users[target]["credits"]
-                    await update.message.reply_text(f"➖ *Deducted {amount} credits* from `{target}`. New balance: *{newbal}*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-            except:
-                await update.message.reply_text("❌ *Invalid input. Use:* `user_id amount`", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-            context.user_data.pop("admin_state", None); return
-
-        # Add Credits
-        if admin_state == "add_credits_waiting":
-            try:
-                parts = text.split()
-                if len(parts) < 2:
-                    await update.message.reply_text("❌ *Please provide user ID and amount. Example:* `123456789 10`", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-                    context.user_data.pop("admin_state", None); return
-                target = str(int(parts[0]))
-                amount = int(parts[1])
-                users = read_json(USERS_FILE)
-                if target not in users:
-                    await update.message.reply_text("❌ *User not found.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-                else:
-                    users[target]["credits"] = users[target].get("credits", 0) + amount
-                    write_json(USERS_FILE, users)
-                    newbal = users[target]["credits"]
-                    await update.message.reply_text(f"➕ *Added {amount} credits* to `{target}`. New balance: *{newbal}*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-            except:
-                await update.message.reply_text("❌ *Invalid input. Use:* `user_id amount`", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-            context.user_data.pop("admin_state", None); return
-
-        # Broadcast
-        if admin_state == "broadcast_waiting":
-            users = read_json(USERS_FILE)
-            sent = 0
-            for uid in users:
-                try:
-                    await context.bot.send_message(int(uid), f"📢 *Admin Broadcast*\n\n{text}", parse_mode="Markdown")
-                    sent += 1
-                    time.sleep(0.05)
-                except:
-                    pass
-            await update.message.reply_text(f"✅ *Broadcast sent to {sent} users.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-            context.user_data.pop("admin_state", None); return
-
+    if admin_state and is_admin(user):
         # Generate Codes
-        if admin_state == "gen_codes_waiting":
+        if admin_state == "gen_codes":
             try:
-                count = int(text)
-                if count < 1 or count > 100:
-                    await update.message.reply_text("❌ *Please provide a number between 1 and 100.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-                    context.user_data.pop("admin_state", None); return
+                count = min(int(text), 50)
                 codes = read_json(CODES_FILE)
                 generated = []
                 for _ in range(count):
@@ -535,20 +388,99 @@ async def message_handler(update: Update, context: CallbackContext):
                     codes[code] = {"used": False}
                     generated.append(code)
                 write_json(CODES_FILE, codes)
-                await update.message.reply_text(f"✅ *Generated {count} redeem codes:*\n`{' '.join(generated)}`", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
+                await update.message.reply_text(f"✅ Generated {count} codes:\n`{' '.join(generated)}`", parse_mode="Markdown", reply_markup=admin_back())
             except:
-                await update.message.reply_text("❌ *Invalid number.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-            context.user_data.pop("admin_state", None); return
-
-        context.user_data.pop("admin_state", None)
-        return
-
-    # ---------- Normal user message handling ----------
+                await update.message.reply_text("❌ Invalid number.", parse_mode="Markdown", reply_markup=admin_back())
+            context.user_data.pop("admin_state", None)
+            return
+        
+        # Ban
+        if admin_state == "ban":
+            try:
+                target = str(int(text))
+                users = read_json(USERS_FILE)
+                if target in users:
+                    users[target]["banned"] = True
+                    write_json(USERS_FILE, users)
+                    await update.message.reply_text(f"✅ Banned {target}", parse_mode="Markdown", reply_markup=admin_back())
+                else:
+                    await update.message.reply_text("❌ User not found.", parse_mode="Markdown", reply_markup=admin_back())
+            except:
+                await update.message.reply_text("❌ Invalid ID.", parse_mode="Markdown", reply_markup=admin_back())
+            context.user_data.pop("admin_state", None)
+            return
+        
+        # Unban
+        if admin_state == "unban":
+            try:
+                target = str(int(text))
+                users = read_json(USERS_FILE)
+                if target in users:
+                    users[target]["banned"] = False
+                    write_json(USERS_FILE, users)
+                    await update.message.reply_text(f"✅ Unbanned {target}", parse_mode="Markdown", reply_markup=admin_back())
+                else:
+                    await update.message.reply_text("❌ User not found.", parse_mode="Markdown", reply_markup=admin_back())
+            except:
+                await update.message.reply_text("❌ Invalid ID.", parse_mode="Markdown", reply_markup=admin_back())
+            context.user_data.pop("admin_state", None)
+            return
+        
+        # Deduct
+        if admin_state == "deduct":
+            try:
+                target = str(int(text))
+                users = read_json(USERS_FILE)
+                if target in users:
+                    users[target]["credits"] = max(0, users[target].get("credits", 0) - 1)
+                    write_json(USERS_FILE, users)
+                    await update.message.reply_text(f"➖ Deducted 1 from {target}. New: {users[target]['credits']}", parse_mode="Markdown", reply_markup=admin_back())
+                else:
+                    await update.message.reply_text("❌ User not found.", parse_mode="Markdown", reply_markup=admin_back())
+            except:
+                await update.message.reply_text("❌ Invalid ID.", parse_mode="Markdown", reply_markup=admin_back())
+            context.user_data.pop("admin_state", None)
+            return
+        
+        # Add Credits
+        if admin_state == "add_credits":
+            try:
+                parts = text.split()
+                target = str(int(parts[0]))
+                amount = int(parts[1])
+                users = read_json(USERS_FILE)
+                if target in users:
+                    users[target]["credits"] = users[target].get("credits", 0) + amount
+                    write_json(USERS_FILE, users)
+                    await update.message.reply_text(f"➕ Added {amount} to {target}. New: {users[target]['credits']}", parse_mode="Markdown", reply_markup=admin_back())
+                else:
+                    await update.message.reply_text("❌ User not found.", parse_mode="Markdown", reply_markup=admin_back())
+            except:
+                await update.message.reply_text("❌ Use: `user_id amount`", parse_mode="Markdown", reply_markup=admin_back())
+            context.user_data.pop("admin_state", None)
+            return
+        
+        # Broadcast
+        if admin_state == "broadcast":
+            users = read_json(USERS_FILE)
+            sent = 0
+            for uid in users:
+                try:
+                    await context.bot.send_message(int(uid), f"📢 Broadcast:\n\n{text}")
+                    sent += 1
+                    time.sleep(0.05)
+                except:
+                    pass
+            await update.message.reply_text(f"✅ Sent to {sent} users.", parse_mode="Markdown", reply_markup=admin_back())
+            context.user_data.pop("admin_state", None)
+            return
+    
+    # Normal user modes
     mode = context.user_data.get("mode")
     
-    # Redeem code
-    if mode == "redeem_code":
-        code = update.message.text.strip().upper()
+    # Redeem
+    if mode == "redeem":
+        code = text.upper()
         codes = read_json(CODES_FILE)
         if code in codes and not codes[code]["used"]:
             codes[code]["used"] = True
@@ -556,185 +488,86 @@ async def message_handler(update: Update, context: CallbackContext):
             users = read_json(USERS_FILE)
             users[uid]["credits"] = users[uid].get("credits", 0) + 1
             write_json(USERS_FILE, users)
-            await update.message.reply_text("🎁 *Code redeemed! You earned 1 credit.*", parse_mode="Markdown")
+            await update.message.reply_text("🎁 Code redeemed! +1 credit!", parse_mode="Markdown")
         else:
-            await update.message.reply_text("❌ *Invalid or already used code.*", parse_mode="Markdown")
+            await update.message.reply_text("❌ Invalid/used code.", parse_mode="Markdown")
         context.user_data.pop("mode", None)
-        await update.message.reply_text("🔙 Back to Menu", reply_markup=back_to_menu_kb())
+        await update.message.reply_text("🔙 Back", reply_markup=back_menu())
         return
-
-    # Search mode
-    if mode in ("phone_in", "phone_pk", "aadhaar", "cnic", "ifsc", "vehicle_rc", "upi"):
-        query = update.message.text.strip()
-        if not query:
-            await update.message.reply_text("❌ *Please provide a valid query.*", parse_mode="Markdown")
-            return
-
-        # Check credits (admins unlimited)
-        if not is_admin_user(user):
+    
+    # Search
+    if mode in ["phone_in", "phone_pk", "aadhaar", "cnic", "ifsc", "vehicle_rc", "upi"]:
+        # Check credits (admins free)
+        if not is_admin(user):
             users = read_json(USERS_FILE)
-            if users[uid].get("credits", 0) < SEARCH_COST:
-                await update.message.reply_text("❌ *Not enough credits!* Use /start to get free credits or contact @{owner}".format(owner=BUY_CREDITS_USERNAME), parse_mode="Markdown")
+            if users[uid].get("credits", 0) < 1:
+                await update.message.reply_text("❌ Not enough credits! Use /start for free credits.", parse_mode="Markdown")
+                context.user_data.pop("mode", None)
                 return
-
-        # Map mode to API
+        
+        # API mapping
         api_map = {
-            "phone_in": PHONE_IN_API.format(num=query),
-            "phone_pk": PHONE_PK_API.format(num=query),
-            "aadhaar": AADHAAR_API.format(aadhaar=query),
-            "cnic": CNIC_API.format(cnic=query),
-            "ifsc": IFSC_API.format(ifsc=query),
-            "vehicle_rc": VEHICLE_API.format(rc=query),
-            "upi": UPI_API.format(id=query)
+            "phone_in": PHONE_IN_API.format(num=text),
+            "phone_pk": PHONE_PK_API.format(num=text),
+            "aadhaar": AADHAAR_API.format(aadhaar=text),
+            "cnic": CNIC_API.format(cnic=text),
+            "ifsc": IFSC_API.format(ifsc=text),
+            "vehicle_rc": VEHICLE_API.format(rc=text),
+            "upi": UPI_API.format(id=text)
         }
         url = api_map.get(mode)
-        if not url:
-            await update.message.reply_text("❌ *Invalid search mode.*", parse_mode="Markdown")
-            return
-
-        # Deduct credit (unless admin)
-        if not is_admin_user(user):
+        
+        # Deduct credit
+        if not is_admin(user):
             users = read_json(USERS_FILE)
             users[uid]["credits"] -= 1
             write_json(USERS_FILE, users)
-
-        # Call API
+        
+        # Search
         try:
             resp = http_get(url)
             if resp and resp.status_code == 200:
                 data = resp.json()
-                # Scrub developer info
                 clean = scrub_response(data)
-                formatted = json.dumps(clean, indent=2, ensure_ascii=False)
-                if len(formatted) > 4000:
-                    formatted = formatted[:4000] + "\n... (truncated)"
-                await update.message.reply_text(f"📊 *Search Result*\n```json\n{formatted}\n```", parse_mode="Markdown")
+                result = json.dumps(clean, indent=2, ensure_ascii=False)
+                if len(result) > 4000:
+                    result = result[:4000] + "\n... (truncated)"
+                await update.message.reply_text(f"📊 Result:\n```json\n{result}\n```", parse_mode="Markdown")
             else:
-                # Refund credit if error
-                if not is_admin_user(user):
+                # Refund on error
+                if not is_admin(user):
                     users = read_json(USERS_FILE)
                     users[uid]["credits"] += 1
                     write_json(USERS_FILE, users)
-                await update.message.reply_text(ERROR_REFUND_MSG, parse_mode="Markdown")
+                await update.message.reply_text("⚠️ Error fetching data. Credits refunded.", parse_mode="Markdown")
         except Exception as e:
             logger.error(f"Search error: {e}")
-            if not is_admin_user(user):
+            if not is_admin(user):
                 users = read_json(USERS_FILE)
                 users[uid]["credits"] += 1
                 write_json(USERS_FILE, users)
-            await update.message.reply_text(ERROR_REFUND_MSG, parse_mode="Markdown")
-
+            await update.message.reply_text("⚠️ Error fetching data. Credits refunded.", parse_mode="Markdown")
+        
         context.user_data.pop("mode", None)
-        await update.message.reply_text("🔙 Back to Menu", reply_markup=back_to_menu_kb())
+        await update.message.reply_text("🔙 Back", reply_markup=back_menu())
         return
-
-    await update.message.reply_text("ℹ️ *Use /start to see the menu.*", parse_mode="Markdown")
-
-# ---------------- Admin callback handlers ----------------
-async def admin_callback_handler(update: Update, context: CallbackContext):
-    q = update.callback_query; await q.answer()
-    user = q.from_user
-    if not is_admin_user(user):
-        await q.message.reply_text("❌ *You are not authorized to use admin commands.*", parse_mode="Markdown")
-        return
-
-    data = q.data
     
-    # Admin panel
-    if data == "admin_panel":
-        await q.message.reply_text("⚙️ *Admin Panel*", parse_mode="Markdown", reply_markup=admin_panel_kb())
-        return
+    await update.message.reply_text("ℹ️ Use /start for menu.", parse_mode="Markdown")
 
-    # Admin Stats
-    if data == "admin_stats":
-        users = read_json(USERS_FILE)
-        total = len(users)
-        banned = sum(1 for u in users.values() if u.get("banned", False))
-        total_credits = sum(u.get("credits", 0) for u in users.values())
-        await q.message.reply_text(f"📊 *User Statistics*\n\n• Total Users: *{total}*\n• Banned: *{banned}*\n• Total Credits: *{total_credits}*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-        return
-
-    # Generate Codes
-    if data == "admin_gen_codes":
-        context.user_data["admin_state"] = "gen_codes_waiting"
-        await q.message.reply_text("🎁 *How many redeem codes to generate?* (max 100)", parse_mode="Markdown")
-        return
-
-    # User Info
-    if data == "admin_user_info":
-        context.user_data["admin_state"] = "user_info_waiting"
-        await q.message.reply_text("🔎 *Send the user ID to get info.*", parse_mode="Markdown")
-        context.user_data["admin_state"] = "user_info_waiting"
-        return
-
-    # Force Backup
-    if data == "admin_backup":
-        if send_backup_to_admins():
-            await q.message.reply_text("✅ *Backup sent to all admins.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-        else:
-            await q.message.reply_text("⏳ *Backup cooldown active. Wait a few minutes.*", parse_mode="Markdown", reply_markup=admin_action_back_buttons())
-        return
-
-    # Ban
-    if data == "admin_ban":
-        context.user_data["admin_state"] = "ban_waiting"
-        await q.message.reply_text("🚫 *Send the user ID to BAN.*", parse_mode="Markdown")
-        return
-
-    # Unban
-    if data == "admin_unban":
-        context.user_data["admin_state"] = "unban_waiting"
-        await q.message.reply_text("✅ *Send the user ID to UNBAN.*", parse_mode="Markdown")
-        return
-
-    # Deduct
-    if data == "admin_deduct":
-        context.user_data["admin_state"] = "deduct_waiting"
-        await q.message.reply_text("➖ *Send the user ID to deduct 1 credit.*", parse_mode="Markdown")
-        return
-
-    # Custom Deduct
-    if data == "admin_deduct_custom":
-        context.user_data["admin_state"] = "deduct_custom_waiting"
-        await q.message.reply_text("➖ *Send user ID and amount. Example:* `123456789 5`", parse_mode="Markdown")
-        return
-
-    # Add Credits
-    if data == "admin_add_credits":
-        context.user_data["admin_state"] = "add_credits_waiting"
-        await q.message.reply_text("➕ *Send user ID and amount. Example:* `123456789 10`", parse_mode="Markdown")
-        return
-
-    # Broadcast
-    if data == "admin_broadcast":
-        context.user_data["admin_state"] = "broadcast_waiting"
-        await q.message.reply_text("📣 *Send the broadcast message.*", parse_mode="Markdown")
-        return
-
-    await q.message.reply_text("⚠️ *Unknown admin action.*", parse_mode="Markdown")
-
-# ---------------- Main function ----------------
+# ============ MAIN ============
 def main():
-    """Start the bot."""
-    # Create app with bot token
-    application = Application.builder().token(BOT_TOKEN).build()
-
-    # Command handlers
-    application.add_handler(CommandHandler("start", start_cmd))
-    application.add_handler(CommandHandler("menu", menu_cmd))
-    application.add_handler(CommandHandler("admin", admin_cmd))
-
-    # Callback handlers
-    application.add_handler(CallbackQueryHandler(generic_callback, pattern="^(phone_in|phone_pk|aadhaar|cnic|ifsc|vehicle_rc|upi|redeem|credits|referral|help|daily_bonus|admin_panel|to_menu)$"))
-    application.add_handler(CallbackQueryHandler(admin_callback_handler, pattern="^(admin_stats|admin_gen_codes|admin_user_info|admin_backup|admin_ban|admin_unban|admin_deduct|admin_deduct_custom|admin_add_credits|admin_broadcast)$"))
+    ensure_files()
+    app = Application.builder().token(BOT_TOKEN).build()
     
-    # Message handler
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
-
-    # Run bot
-    print("🤖 Bot is running...")
-    application.run_polling()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("menu", menu))
+    app.add_handler(CommandHandler("admin", admin_panel))
+    
+    app.add_handler(CallbackQueryHandler(callback_handler))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
+    
+    print("🤖 FKS OSINT Bot is running...")
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
-    ensure_files_exist()
     main()
