@@ -17,10 +17,10 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot, Me
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, CallbackContext
 
 # ---------------- CONFIG ----------------
-BOT_TOKEN = "YOUR_BOT_TOKEN"
-BOT_USERNAME = "YOUR_BOT_USERNAME"        # provided by you (no @)
-BUY_CREDITS_USERNAME = "YOUR_USERNAME" # contact username (no @)
-ADMIN_IDS = [YOUR_ADMINS_IDS]               # admin numeric IDs
+BOT_TOKEN = "8759960516:AAEWakdCpP7J7sSNXd6PtL34-l78vMF5zL4"
+BOT_USERNAME = "SearchPortalBot"        # provided by you (no @)
+BUY_CREDITS_USERNAME = "ColdenMinj" # contact username (no @)
+ADMIN_IDS = [8523360387]               # admin numeric IDs
 
 # core settings
 REFERRAL_BONUS = 2
