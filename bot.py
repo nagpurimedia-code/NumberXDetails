@@ -1,4 +1,4 @@
-# FKS OSINT BOT - PYTHON 3.10 COMPATIBLE
+# FKS OSINT BOT - RENDER.COM FIXED
 # Telegram: @ColdenMinj
 
 import os
@@ -8,8 +8,7 @@ import random
 import string
 import logging
 import requests
-from typing import Optional, Dict, Any
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters, CallbackContext
 
 # ============ CONFIG ============
@@ -30,7 +29,7 @@ USERS_FILE = "users.json"
 CODES_FILE = "redeem_codes.json"
 BACKUP_META = "backup_meta.json"
 
-# ============ API ENDPOINTS (REPLACE WITH YOUR ACTUAL APIS) ============
+# ============ API ENDPOINTS ============
 PHONE_IN_API = "https://yourapi.com/phone_in?number={num}"
 PHONE_PK_API = "https://yourapi.com/phone_pk?number={num}"
 AADHAAR_API = "https://yourapi.com/aadhaar?id={aadhaar}"
@@ -40,22 +39,22 @@ VEHICLE_API = "https://yourapi.com/vehicle?rc={rc}"
 UPI_API = "https://yourapi.com/upi?id={upi}"
 
 # ============ LOGGING ============
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-logger = logging.getLogger("fks-bot")
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # ============ FILE HELPERS ============
 def read_json(path):
     if not os.path.exists(path):
         return {}
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, 'r', encoding='utf-8') as f:
             return json.load(f)
     except:
         return {}
 
 def write_json(path, data):
     try:
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
     except Exception as e:
         logger.error(f"Write error: {e}")
@@ -69,12 +68,13 @@ def ensure_files():
 def gen_code():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=GENERATED_CODE_LENGTH))
 
-def http_get(url, timeout=12):
+def http_get(url, timeout=10):
     try:
         r = requests.get(url, headers={"User-Agent": "FKS-BOT"}, timeout=timeout)
         r.raise_for_status()
         return r
-    except:
+    except Exception as e:
+        logger.error(f"HTTP error: {e}")
         return None
 
 def ensure_user(uid):
@@ -97,16 +97,10 @@ def is_banned(uid):
 def is_admin(user):
     if not user:
         return False
-    try:
-        if user.id in ADMIN_IDS:
-            return True
-    except:
-        pass
-    try:
-        if user.username and user.username.lower() == BUY_CREDITS_USERNAME.lower():
-            return True
-    except:
-        pass
+    if user.id in ADMIN_IDS:
+        return True
+    if user.username and user.username.lower() == BUY_CREDITS_USERNAME.lower():
+        return True
     return False
 
 def scrub_response(obj):
@@ -130,7 +124,7 @@ def send_backup():
     if now - meta.get("last", 0) < BACKUP_COOLDOWN:
         return False
     try:
-        bot = Bot(token=BOT_TOKEN)
+        bot = Updater(token=BOT_TOKEN, use_context=True).bot
         if os.path.exists(USERS_FILE):
             for admin in ADMIN_IDS:
                 try:
@@ -200,7 +194,6 @@ def start(update: Update, context: CallbackContext):
         update.message.reply_text("❌ You are banned.", parse_mode="Markdown")
         return
     
-    # Referral
     args = context.args
     if args and is_new:
         try:
@@ -220,7 +213,13 @@ def start(update: Update, context: CallbackContext):
         except:
             pass
     
-    welcome = f"👋 Hi {user.first_name}! Welcome to FKS OSINT Bot.\n\n🔍 Each search costs 1 credit.\n🎁 Daily bonus: {DAILY_BONUS_AMOUNT} credits\n🎯 Referral: {REFERRAL_BONUS} credits per referral\n\nContact @{BUY_CREDITS_USERNAME} for help."
+    welcome = f"""👋 Hi {user.first_name}! Welcome to FKS OSINT Bot.
+
+🔍 Each search costs 1 credit.
+🎁 Daily bonus: {DAILY_BONUS_AMOUNT} credits
+🎯 Referral: {REFERRAL_BONUS} credits per referral
+
+Contact @{BUY_CREDITS_USERNAME} for help."""
     update.message.reply_text(welcome, parse_mode="Markdown")
     update.message.reply_text("✅ Choose an option:", reply_markup=main_menu())
 
@@ -242,13 +241,11 @@ def callback_handler(update: Update, context: CallbackContext):
     uid = str(user.id)
     data = query.data
     
-    # Admin callbacks
     if data.startswith("admin_"):
         if not is_admin(user):
             query.message.reply_text("❌ Unauthorized.", parse_mode="Markdown")
             return
         
-        # Admin Stats
         if data == "admin_stats":
             users = read_json(USERS_FILE)
             total = len(users)
@@ -257,13 +254,11 @@ def callback_handler(update: Update, context: CallbackContext):
             query.message.reply_text(f"📊 Stats:\nTotal: {total}\nBanned: {banned}\nCredits: {credits}", parse_mode="Markdown", reply_markup=admin_back())
             return
         
-        # Generate Codes
         if data == "admin_gen_codes":
             context.user_data["admin_state"] = "gen_codes"
             query.message.reply_text("🎁 How many codes? (max 50)", parse_mode="Markdown")
             return
         
-        # Backup
         if data == "admin_backup":
             if send_backup():
                 query.message.reply_text("✅ Backup sent.", parse_mode="Markdown", reply_markup=admin_back())
@@ -271,42 +266,35 @@ def callback_handler(update: Update, context: CallbackContext):
                 query.message.reply_text("⏳ Cooldown active.", parse_mode="Markdown", reply_markup=admin_back())
             return
         
-        # Ban
         if data == "admin_ban":
             context.user_data["admin_state"] = "ban"
             query.message.reply_text("🚫 Send user ID to ban:", parse_mode="Markdown")
             return
         
-        # Unban
         if data == "admin_unban":
             context.user_data["admin_state"] = "unban"
             query.message.reply_text("✅ Send user ID to unban:", parse_mode="Markdown")
             return
         
-        # Deduct
         if data == "admin_deduct":
             context.user_data["admin_state"] = "deduct"
             query.message.reply_text("➖ Send user ID to deduct 1 credit:", parse_mode="Markdown")
             return
         
-        # Add Credits
         if data == "admin_add_credits":
             context.user_data["admin_state"] = "add_credits"
             query.message.reply_text("➕ Send: `user_id amount` (e.g. 123 5)", parse_mode="Markdown")
             return
         
-        # Broadcast
         if data == "admin_broadcast":
             context.user_data["admin_state"] = "broadcast"
             query.message.reply_text("📣 Send broadcast message:", parse_mode="Markdown")
             return
         
-        # Admin Panel
         if data == "admin_panel":
             query.message.reply_text("⚙️ Admin Panel:", reply_markup=admin_menu())
             return
     
-    # Public callbacks
     if data == "to_menu":
         try:
             query.message.delete()
@@ -316,7 +304,17 @@ def callback_handler(update: Update, context: CallbackContext):
         return
     
     if data == "help":
-        help_text = "🔍 Available searches:\n• Phone (IN/PK)\n• Aadhaar\n• CNIC\n• IFSC\n• Vehicle/RC\n• UPI\n\n💳 Each search costs 1 credit.\n🎁 Daily bonus available.\n🎯 Referral program active."
+        help_text = """🔍 Available searches:
+• Phone (IN/PK)
+• Aadhaar
+• CNIC
+• IFSC
+• Vehicle/RC
+• UPI
+
+💳 Each search costs 1 credit.
+🎁 Daily bonus available.
+🎯 Referral program active."""
         query.message.reply_text(help_text, parse_mode="Markdown", reply_markup=back_menu())
         return
     
@@ -351,7 +349,6 @@ def callback_handler(update: Update, context: CallbackContext):
         query.message.reply_text("🎁 Send your redeem code:", parse_mode="Markdown")
         return
     
-    # Search modes
     if data in ["phone_in", "phone_pk", "aadhaar", "cnic", "ifsc", "vehicle_rc", "upi"]:
         context.user_data["mode"] = data
         label = "RC/Vehicle" if data == "vehicle_rc" else data.upper()
@@ -374,10 +371,8 @@ def message_handler(update: Update, context: CallbackContext):
     
     ensure_user(uid)
     
-    # Admin states
     admin_state = context.user_data.get("admin_state")
     if admin_state and is_admin(user):
-        # Generate Codes
         if admin_state == "gen_codes":
             try:
                 count = min(int(text), 50)
@@ -394,7 +389,6 @@ def message_handler(update: Update, context: CallbackContext):
             context.user_data.pop("admin_state", None)
             return
         
-        # Ban
         if admin_state == "ban":
             try:
                 target = str(int(text))
@@ -410,7 +404,6 @@ def message_handler(update: Update, context: CallbackContext):
             context.user_data.pop("admin_state", None)
             return
         
-        # Unban
         if admin_state == "unban":
             try:
                 target = str(int(text))
@@ -426,7 +419,6 @@ def message_handler(update: Update, context: CallbackContext):
             context.user_data.pop("admin_state", None)
             return
         
-        # Deduct
         if admin_state == "deduct":
             try:
                 target = str(int(text))
@@ -442,7 +434,6 @@ def message_handler(update: Update, context: CallbackContext):
             context.user_data.pop("admin_state", None)
             return
         
-        # Add Credits
         if admin_state == "add_credits":
             try:
                 parts = text.split()
@@ -460,7 +451,6 @@ def message_handler(update: Update, context: CallbackContext):
             context.user_data.pop("admin_state", None)
             return
         
-        # Broadcast
         if admin_state == "broadcast":
             users = read_json(USERS_FILE)
             sent = 0
@@ -475,10 +465,8 @@ def message_handler(update: Update, context: CallbackContext):
             context.user_data.pop("admin_state", None)
             return
     
-    # Normal user modes
     mode = context.user_data.get("mode")
     
-    # Redeem
     if mode == "redeem":
         code = text.upper()
         codes = read_json(CODES_FILE)
@@ -495,9 +483,7 @@ def message_handler(update: Update, context: CallbackContext):
         update.message.reply_text("🔙 Back", reply_markup=back_menu())
         return
     
-    # Search
     if mode in ["phone_in", "phone_pk", "aadhaar", "cnic", "ifsc", "vehicle_rc", "upi"]:
-        # Check credits (admins free)
         if not is_admin(user):
             users = read_json(USERS_FILE)
             if users[uid].get("credits", 0) < 1:
@@ -505,7 +491,6 @@ def message_handler(update: Update, context: CallbackContext):
                 context.user_data.pop("mode", None)
                 return
         
-        # API mapping
         api_map = {
             "phone_in": PHONE_IN_API.format(num=text),
             "phone_pk": PHONE_PK_API.format(num=text),
@@ -517,13 +502,11 @@ def message_handler(update: Update, context: CallbackContext):
         }
         url = api_map.get(mode)
         
-        # Deduct credit
         if not is_admin(user):
             users = read_json(USERS_FILE)
             users[uid]["credits"] -= 1
             write_json(USERS_FILE, users)
         
-        # Search
         try:
             resp = http_get(url)
             if resp and resp.status_code == 200:
@@ -534,7 +517,6 @@ def message_handler(update: Update, context: CallbackContext):
                     result = result[:4000] + "\n... (truncated)"
                 update.message.reply_text(f"📊 Result:\n```json\n{result}\n```", parse_mode="Markdown")
             else:
-                # Refund on error
                 if not is_admin(user):
                     users = read_json(USERS_FILE)
                     users[uid]["credits"] += 1
@@ -557,9 +539,12 @@ def message_handler(update: Update, context: CallbackContext):
 # ============ MAIN ============
 def main():
     ensure_files()
+    
+    # Create the Updater and pass it your bot's token.
     updater = Updater(token=BOT_TOKEN, use_context=True)
     dp = updater.dispatcher
     
+    # Add handlers
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(CommandHandler("menu", menu))
     dp.add_handler(CommandHandler("admin", admin_panel))
@@ -567,7 +552,8 @@ def main():
     dp.add_handler(CallbackQueryHandler(callback_handler))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, message_handler))
     
-    print("🤖 FKS OSINT Bot is running...")
+    # Start the Bot
+    logger.info("🤖 FKS OSINT Bot is running...")
     updater.start_polling()
     updater.idle()
 
