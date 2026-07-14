@@ -1,4 +1,4 @@
-# FKS OSINT BOT - FULLY WORKING
+# FKS OSINT BOT - PYTHON 3.14 COMPATIBLE
 # Telegram: @ColdenMinj
 
 import os
@@ -7,10 +7,11 @@ import time
 import random
 import string
 import logging
+import asyncio
 import requests
 from typing import Optional
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, CallbackContext
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
 # ============ CONFIG ============
 BOT_TOKEN = "8759960516:AAEWakdCpP7J7sSNXd6PtL34-l78vMF5zL4"
@@ -187,7 +188,7 @@ def admin_back():
     ])
 
 # ============ COMMANDS ============
-async def start(update: Update, context: CallbackContext):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     uid = str(user.id)
     
@@ -224,10 +225,10 @@ async def start(update: Update, context: CallbackContext):
     await update.message.reply_text(welcome, parse_mode="Markdown")
     await update.message.reply_text("✅ Choose an option:", reply_markup=main_menu())
 
-async def menu(update: Update, context: CallbackContext):
+async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ Choose an option:", reply_markup=main_menu())
 
-async def admin_panel(update: Update, context: CallbackContext):
+async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if not is_admin(user):
         await update.message.reply_text("❌ Unauthorized.", parse_mode="Markdown")
@@ -235,7 +236,7 @@ async def admin_panel(update: Update, context: CallbackContext):
     await update.message.reply_text("⚙️ Admin Panel:", reply_markup=admin_menu())
 
 # ============ CALLBACKS ============
-async def callback_handler(update: Update, context: CallbackContext):
+async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user = query.from_user
@@ -363,7 +364,7 @@ async def callback_handler(update: Update, context: CallbackContext):
     await query.message.reply_text("⚠️ Unknown option.", parse_mode="Markdown")
 
 # ============ MESSAGE HANDLER ============
-async def message_handler(update: Update, context: CallbackContext):
+async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     uid = str(user.id)
     text = update.message.text.strip()
@@ -468,7 +469,7 @@ async def message_handler(update: Update, context: CallbackContext):
                 try:
                     await context.bot.send_message(int(uid), f"📢 Broadcast:\n\n{text}")
                     sent += 1
-                    time.sleep(0.05)
+                    await asyncio.sleep(0.05)
                 except:
                     pass
             await update.message.reply_text(f"✅ Sent to {sent} users.", parse_mode="Markdown", reply_markup=admin_back())
