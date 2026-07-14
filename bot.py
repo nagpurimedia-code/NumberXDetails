@@ -1,4 +1,4 @@
-# FKS OSINT BOT - PYTHON 3.14 COMPATIBLE
+# FKS OSINT BOT - PYTHON 3.10 COMPATIBLE
 # Telegram: @ColdenMinj
 
 import os
@@ -7,11 +7,10 @@ import time
 import random
 import string
 import logging
-import asyncio
 import requests
-from typing import Optional
+from typing import Optional, Dict, Any
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters, CallbackContext
 
 # ============ CONFIG ============
 BOT_TOKEN = "8759960516:AAEWakdCpP7J7sSNXd6PtL34-l78vMF5zL4"
@@ -188,7 +187,7 @@ def admin_back():
     ])
 
 # ============ COMMANDS ============
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def start(update: Update, context: CallbackContext):
     user = update.effective_user
     uid = str(user.id)
     
@@ -198,7 +197,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ensure_user(uid)
     
     if is_banned(uid):
-        await update.message.reply_text("❌ You are banned.", parse_mode="Markdown")
+        update.message.reply_text("❌ You are banned.", parse_mode="Markdown")
         return
     
     # Referral
@@ -215,30 +214,30 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         users[ref]["referrals"] = users[ref].get("referrals", 0) + 1
                         write_json(USERS_FILE, users)
                         try:
-                            await context.bot.send_message(int(ref), f"🎉 You earned {REFERRAL_BONUS} credits from referral!")
+                            context.bot.send_message(int(ref), f"🎉 You earned {REFERRAL_BONUS} credits from referral!")
                         except:
                             pass
         except:
             pass
     
     welcome = f"👋 Hi {user.first_name}! Welcome to FKS OSINT Bot.\n\n🔍 Each search costs 1 credit.\n🎁 Daily bonus: {DAILY_BONUS_AMOUNT} credits\n🎯 Referral: {REFERRAL_BONUS} credits per referral\n\nContact @{BUY_CREDITS_USERNAME} for help."
-    await update.message.reply_text(welcome, parse_mode="Markdown")
-    await update.message.reply_text("✅ Choose an option:", reply_markup=main_menu())
+    update.message.reply_text(welcome, parse_mode="Markdown")
+    update.message.reply_text("✅ Choose an option:", reply_markup=main_menu())
 
-async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("✅ Choose an option:", reply_markup=main_menu())
+def menu(update: Update, context: CallbackContext):
+    update.message.reply_text("✅ Choose an option:", reply_markup=main_menu())
 
-async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def admin_panel(update: Update, context: CallbackContext):
     user = update.effective_user
     if not is_admin(user):
-        await update.message.reply_text("❌ Unauthorized.", parse_mode="Markdown")
+        update.message.reply_text("❌ Unauthorized.", parse_mode="Markdown")
         return
-    await update.message.reply_text("⚙️ Admin Panel:", reply_markup=admin_menu())
+    update.message.reply_text("⚙️ Admin Panel:", reply_markup=admin_menu())
 
 # ============ CALLBACKS ============
-async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def callback_handler(update: Update, context: CallbackContext):
     query = update.callback_query
-    await query.answer()
+    query.answer()
     user = query.from_user
     uid = str(user.id)
     data = query.data
@@ -246,7 +245,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Admin callbacks
     if data.startswith("admin_"):
         if not is_admin(user):
-            await query.message.reply_text("❌ Unauthorized.", parse_mode="Markdown")
+            query.message.reply_text("❌ Unauthorized.", parse_mode="Markdown")
             return
         
         # Admin Stats
@@ -255,75 +254,75 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             total = len(users)
             banned = sum(1 for u in users.values() if u.get("banned", False))
             credits = sum(u.get("credits", 0) for u in users.values())
-            await query.message.reply_text(f"📊 Stats:\nTotal: {total}\nBanned: {banned}\nCredits: {credits}", parse_mode="Markdown", reply_markup=admin_back())
+            query.message.reply_text(f"📊 Stats:\nTotal: {total}\nBanned: {banned}\nCredits: {credits}", parse_mode="Markdown", reply_markup=admin_back())
             return
         
         # Generate Codes
         if data == "admin_gen_codes":
             context.user_data["admin_state"] = "gen_codes"
-            await query.message.reply_text("🎁 How many codes? (max 50)", parse_mode="Markdown")
+            query.message.reply_text("🎁 How many codes? (max 50)", parse_mode="Markdown")
             return
         
         # Backup
         if data == "admin_backup":
             if send_backup():
-                await query.message.reply_text("✅ Backup sent.", parse_mode="Markdown", reply_markup=admin_back())
+                query.message.reply_text("✅ Backup sent.", parse_mode="Markdown", reply_markup=admin_back())
             else:
-                await query.message.reply_text("⏳ Cooldown active.", parse_mode="Markdown", reply_markup=admin_back())
+                query.message.reply_text("⏳ Cooldown active.", parse_mode="Markdown", reply_markup=admin_back())
             return
         
         # Ban
         if data == "admin_ban":
             context.user_data["admin_state"] = "ban"
-            await query.message.reply_text("🚫 Send user ID to ban:", parse_mode="Markdown")
+            query.message.reply_text("🚫 Send user ID to ban:", parse_mode="Markdown")
             return
         
         # Unban
         if data == "admin_unban":
             context.user_data["admin_state"] = "unban"
-            await query.message.reply_text("✅ Send user ID to unban:", parse_mode="Markdown")
+            query.message.reply_text("✅ Send user ID to unban:", parse_mode="Markdown")
             return
         
         # Deduct
         if data == "admin_deduct":
             context.user_data["admin_state"] = "deduct"
-            await query.message.reply_text("➖ Send user ID to deduct 1 credit:", parse_mode="Markdown")
+            query.message.reply_text("➖ Send user ID to deduct 1 credit:", parse_mode="Markdown")
             return
         
         # Add Credits
         if data == "admin_add_credits":
             context.user_data["admin_state"] = "add_credits"
-            await query.message.reply_text("➕ Send: `user_id amount` (e.g. 123 5)", parse_mode="Markdown")
+            query.message.reply_text("➕ Send: `user_id amount` (e.g. 123 5)", parse_mode="Markdown")
             return
         
         # Broadcast
         if data == "admin_broadcast":
             context.user_data["admin_state"] = "broadcast"
-            await query.message.reply_text("📣 Send broadcast message:", parse_mode="Markdown")
+            query.message.reply_text("📣 Send broadcast message:", parse_mode="Markdown")
             return
         
         # Admin Panel
         if data == "admin_panel":
-            await query.message.reply_text("⚙️ Admin Panel:", reply_markup=admin_menu())
+            query.message.reply_text("⚙️ Admin Panel:", reply_markup=admin_menu())
             return
     
     # Public callbacks
     if data == "to_menu":
         try:
-            await query.message.delete()
+            query.message.delete()
         except:
             pass
-        await query.message.reply_text("✅ Choose an option:", reply_markup=main_menu())
+        query.message.reply_text("✅ Choose an option:", reply_markup=main_menu())
         return
     
     if data == "help":
         help_text = "🔍 Available searches:\n• Phone (IN/PK)\n• Aadhaar\n• CNIC\n• IFSC\n• Vehicle/RC\n• UPI\n\n💳 Each search costs 1 credit.\n🎁 Daily bonus available.\n🎯 Referral program active."
-        await query.message.reply_text(help_text, parse_mode="Markdown", reply_markup=back_menu())
+        query.message.reply_text(help_text, parse_mode="Markdown", reply_markup=back_menu())
         return
     
     if data == "referral":
         link = f"https://t.me/{BOT_USERNAME}?start={uid}"
-        await query.message.reply_text(f"🎯 Your referral link:\n`{link}`\n\nEarn {REFERRAL_BONUS} credits per referral!", parse_mode="Markdown", reply_markup=back_menu())
+        query.message.reply_text(f"🎯 Your referral link:\n`{link}`\n\nEarn {REFERRAL_BONUS} credits per referral!", parse_mode="Markdown", reply_markup=back_menu())
         return
     
     if data == "daily_bonus":
@@ -333,23 +332,23 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             users[uid]["credits"] = users[uid].get("credits", 0) + DAILY_BONUS_AMOUNT
             users[uid]["last_daily"] = now
             write_json(USERS_FILE, users)
-            await query.message.reply_text(f"🎁 +{DAILY_BONUS_AMOUNT} credits claimed!", parse_mode="Markdown")
+            query.message.reply_text(f"🎁 +{DAILY_BONUS_AMOUNT} credits claimed!", parse_mode="Markdown")
         else:
             remaining = DAILY_SECONDS - (now - users[uid].get("last_daily", 0))
             hours = int(remaining // 3600)
-            await query.message.reply_text(f"⏰ Already claimed. Try again in {hours}h.", parse_mode="Markdown")
-        await query.message.reply_text("🔙 Back", reply_markup=back_menu())
+            query.message.reply_text(f"⏰ Already claimed. Try again in {hours}h.", parse_mode="Markdown")
+        query.message.reply_text("🔙 Back", reply_markup=back_menu())
         return
     
     if data == "credits":
         users = read_json(USERS_FILE)
         credits = "Unlimited" if is_admin(user) else users.get(uid, {}).get("credits", 0)
-        await query.message.reply_text(f"💰 Your credits: {credits}", parse_mode="Markdown")
+        query.message.reply_text(f"💰 Your credits: {credits}", parse_mode="Markdown")
         return
     
     if data == "redeem":
         context.user_data["mode"] = "redeem"
-        await query.message.reply_text("🎁 Send your redeem code:", parse_mode="Markdown")
+        query.message.reply_text("🎁 Send your redeem code:", parse_mode="Markdown")
         return
     
     # Search modes
@@ -358,19 +357,19 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         label = "RC/Vehicle" if data == "vehicle_rc" else data.upper()
         if data == "upi":
             label = "UPI ID"
-        await query.message.reply_text(f"📤 Send {label} to search:", parse_mode="Markdown")
+        query.message.reply_text(f"📤 Send {label} to search:", parse_mode="Markdown")
         return
     
-    await query.message.reply_text("⚠️ Unknown option.", parse_mode="Markdown")
+    query.message.reply_text("⚠️ Unknown option.", parse_mode="Markdown")
 
 # ============ MESSAGE HANDLER ============
-async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def message_handler(update: Update, context: CallbackContext):
     user = update.effective_user
     uid = str(user.id)
     text = update.message.text.strip()
     
     if is_banned(uid):
-        await update.message.reply_text("❌ You are banned.", parse_mode="Markdown")
+        update.message.reply_text("❌ You are banned.", parse_mode="Markdown")
         return
     
     ensure_user(uid)
@@ -389,9 +388,9 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     codes[code] = {"used": False}
                     generated.append(code)
                 write_json(CODES_FILE, codes)
-                await update.message.reply_text(f"✅ Generated {count} codes:\n`{' '.join(generated)}`", parse_mode="Markdown", reply_markup=admin_back())
+                update.message.reply_text(f"✅ Generated {count} codes:\n`{' '.join(generated)}`", parse_mode="Markdown", reply_markup=admin_back())
             except:
-                await update.message.reply_text("❌ Invalid number.", parse_mode="Markdown", reply_markup=admin_back())
+                update.message.reply_text("❌ Invalid number.", parse_mode="Markdown", reply_markup=admin_back())
             context.user_data.pop("admin_state", None)
             return
         
@@ -403,11 +402,11 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if target in users:
                     users[target]["banned"] = True
                     write_json(USERS_FILE, users)
-                    await update.message.reply_text(f"✅ Banned {target}", parse_mode="Markdown", reply_markup=admin_back())
+                    update.message.reply_text(f"✅ Banned {target}", parse_mode="Markdown", reply_markup=admin_back())
                 else:
-                    await update.message.reply_text("❌ User not found.", parse_mode="Markdown", reply_markup=admin_back())
+                    update.message.reply_text("❌ User not found.", parse_mode="Markdown", reply_markup=admin_back())
             except:
-                await update.message.reply_text("❌ Invalid ID.", parse_mode="Markdown", reply_markup=admin_back())
+                update.message.reply_text("❌ Invalid ID.", parse_mode="Markdown", reply_markup=admin_back())
             context.user_data.pop("admin_state", None)
             return
         
@@ -419,11 +418,11 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if target in users:
                     users[target]["banned"] = False
                     write_json(USERS_FILE, users)
-                    await update.message.reply_text(f"✅ Unbanned {target}", parse_mode="Markdown", reply_markup=admin_back())
+                    update.message.reply_text(f"✅ Unbanned {target}", parse_mode="Markdown", reply_markup=admin_back())
                 else:
-                    await update.message.reply_text("❌ User not found.", parse_mode="Markdown", reply_markup=admin_back())
+                    update.message.reply_text("❌ User not found.", parse_mode="Markdown", reply_markup=admin_back())
             except:
-                await update.message.reply_text("❌ Invalid ID.", parse_mode="Markdown", reply_markup=admin_back())
+                update.message.reply_text("❌ Invalid ID.", parse_mode="Markdown", reply_markup=admin_back())
             context.user_data.pop("admin_state", None)
             return
         
@@ -435,11 +434,11 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if target in users:
                     users[target]["credits"] = max(0, users[target].get("credits", 0) - 1)
                     write_json(USERS_FILE, users)
-                    await update.message.reply_text(f"➖ Deducted 1 from {target}. New: {users[target]['credits']}", parse_mode="Markdown", reply_markup=admin_back())
+                    update.message.reply_text(f"➖ Deducted 1 from {target}. New: {users[target]['credits']}", parse_mode="Markdown", reply_markup=admin_back())
                 else:
-                    await update.message.reply_text("❌ User not found.", parse_mode="Markdown", reply_markup=admin_back())
+                    update.message.reply_text("❌ User not found.", parse_mode="Markdown", reply_markup=admin_back())
             except:
-                await update.message.reply_text("❌ Invalid ID.", parse_mode="Markdown", reply_markup=admin_back())
+                update.message.reply_text("❌ Invalid ID.", parse_mode="Markdown", reply_markup=admin_back())
             context.user_data.pop("admin_state", None)
             return
         
@@ -453,11 +452,11 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if target in users:
                     users[target]["credits"] = users[target].get("credits", 0) + amount
                     write_json(USERS_FILE, users)
-                    await update.message.reply_text(f"➕ Added {amount} to {target}. New: {users[target]['credits']}", parse_mode="Markdown", reply_markup=admin_back())
+                    update.message.reply_text(f"➕ Added {amount} to {target}. New: {users[target]['credits']}", parse_mode="Markdown", reply_markup=admin_back())
                 else:
-                    await update.message.reply_text("❌ User not found.", parse_mode="Markdown", reply_markup=admin_back())
+                    update.message.reply_text("❌ User not found.", parse_mode="Markdown", reply_markup=admin_back())
             except:
-                await update.message.reply_text("❌ Use: `user_id amount`", parse_mode="Markdown", reply_markup=admin_back())
+                update.message.reply_text("❌ Use: `user_id amount`", parse_mode="Markdown", reply_markup=admin_back())
             context.user_data.pop("admin_state", None)
             return
         
@@ -467,12 +466,12 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             sent = 0
             for uid in users:
                 try:
-                    await context.bot.send_message(int(uid), f"📢 Broadcast:\n\n{text}")
+                    context.bot.send_message(int(uid), f"📢 Broadcast:\n\n{text}")
                     sent += 1
-                    await asyncio.sleep(0.05)
+                    time.sleep(0.05)
                 except:
                     pass
-            await update.message.reply_text(f"✅ Sent to {sent} users.", parse_mode="Markdown", reply_markup=admin_back())
+            update.message.reply_text(f"✅ Sent to {sent} users.", parse_mode="Markdown", reply_markup=admin_back())
             context.user_data.pop("admin_state", None)
             return
     
@@ -489,11 +488,11 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             users = read_json(USERS_FILE)
             users[uid]["credits"] = users[uid].get("credits", 0) + 1
             write_json(USERS_FILE, users)
-            await update.message.reply_text("🎁 Code redeemed! +1 credit!", parse_mode="Markdown")
+            update.message.reply_text("🎁 Code redeemed! +1 credit!", parse_mode="Markdown")
         else:
-            await update.message.reply_text("❌ Invalid/used code.", parse_mode="Markdown")
+            update.message.reply_text("❌ Invalid/used code.", parse_mode="Markdown")
         context.user_data.pop("mode", None)
-        await update.message.reply_text("🔙 Back", reply_markup=back_menu())
+        update.message.reply_text("🔙 Back", reply_markup=back_menu())
         return
     
     # Search
@@ -502,7 +501,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not is_admin(user):
             users = read_json(USERS_FILE)
             if users[uid].get("credits", 0) < 1:
-                await update.message.reply_text("❌ Not enough credits! Use /start for free credits.", parse_mode="Markdown")
+                update.message.reply_text("❌ Not enough credits! Use /start for free credits.", parse_mode="Markdown")
                 context.user_data.pop("mode", None)
                 return
         
@@ -533,42 +532,44 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 result = json.dumps(clean, indent=2, ensure_ascii=False)
                 if len(result) > 4000:
                     result = result[:4000] + "\n... (truncated)"
-                await update.message.reply_text(f"📊 Result:\n```json\n{result}\n```", parse_mode="Markdown")
+                update.message.reply_text(f"📊 Result:\n```json\n{result}\n```", parse_mode="Markdown")
             else:
                 # Refund on error
                 if not is_admin(user):
                     users = read_json(USERS_FILE)
                     users[uid]["credits"] += 1
                     write_json(USERS_FILE, users)
-                await update.message.reply_text("⚠️ Error fetching data. Credits refunded.", parse_mode="Markdown")
+                update.message.reply_text("⚠️ Error fetching data. Credits refunded.", parse_mode="Markdown")
         except Exception as e:
             logger.error(f"Search error: {e}")
             if not is_admin(user):
                 users = read_json(USERS_FILE)
                 users[uid]["credits"] += 1
                 write_json(USERS_FILE, users)
-            await update.message.reply_text("⚠️ Error fetching data. Credits refunded.", parse_mode="Markdown")
+            update.message.reply_text("⚠️ Error fetching data. Credits refunded.", parse_mode="Markdown")
         
         context.user_data.pop("mode", None)
-        await update.message.reply_text("🔙 Back", reply_markup=back_menu())
+        update.message.reply_text("🔙 Back", reply_markup=back_menu())
         return
     
-    await update.message.reply_text("ℹ️ Use /start for menu.", parse_mode="Markdown")
+    update.message.reply_text("ℹ️ Use /start for menu.", parse_mode="Markdown")
 
 # ============ MAIN ============
 def main():
     ensure_files()
-    app = Application.builder().token(BOT_TOKEN).build()
+    updater = Updater(token=BOT_TOKEN, use_context=True)
+    dp = updater.dispatcher
     
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("menu", menu))
-    app.add_handler(CommandHandler("admin", admin_panel))
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(CommandHandler("menu", menu))
+    dp.add_handler(CommandHandler("admin", admin_panel))
     
-    app.add_handler(CallbackQueryHandler(callback_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
+    dp.add_handler(CallbackQueryHandler(callback_handler))
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, message_handler))
     
     print("🤖 FKS OSINT Bot is running...")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    updater.start_polling()
+    updater.idle()
 
 if __name__ == "__main__":
     main()
